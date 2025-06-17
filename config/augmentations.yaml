@@ -1,0 +1,168 @@
+# Albumentations configuration for CircuitCLI dataset augmentation
+# This YAML defines the image augmentation pipeline for training data
+
+augmentations:
+  # Basic geometric transforms
+  - name: "HorizontalFlip"
+    params:
+      p: 0.5
+
+  - name: "VerticalFlip"
+    params:
+      p: 0.2
+
+  - name: "RandomRotate90"
+    params:
+      p: 0.3
+
+  - name: "Rotate"
+    params:
+      limit: 15
+      interpolation: 1  # cv2.INTER_LINEAR
+      border_mode: 0   # cv2.BORDER_CONSTANT
+      value: 255       # White padding
+      p: 0.5
+
+  # Perspective and affine transforms
+  - name: "Perspective"
+    params:
+      scale: 0.05
+      keep_size: true
+      p: 0.3
+
+  - name: "Affine"
+    params:
+      scale: [0.9, 1.1]
+      translate_percent: 0.1
+      rotate: 10
+      shear: 5
+      interpolation: 1
+      cval: 255
+      p: 0.4
+
+  # Photometric transforms
+  - name: "RandomBrightnessContrast"
+    params:
+      brightness_limit: 0.2
+      contrast_limit: 0.2
+      brightness_by_max: true
+      p: 0.6
+
+  - name: "HueSaturationValue"
+    params:
+      hue_shift_limit: 10
+      sat_shift_limit: 15
+      val_shift_limit: 15
+      p: 0.3
+
+  - name: "CLAHE"
+    params:
+      clip_limit: 2.0
+      tile_grid_size: [8, 8]
+      p: 0.3
+
+  - name: "RandomGamma"
+    params:
+      gamma_limit: [80, 120]
+      p: 0.4
+
+  # Blur and noise
+  - name: "OneOf"
+    params:
+      transforms:
+        - name: "Blur"
+          params:
+            blur_limit: 3
+        - name: "GaussianBlur"
+          params:
+            blur_limit: 3
+        - name: "MotionBlur"
+          params:
+            blur_limit: 3
+      p: 0.4
+
+  - name: "GaussNoise"
+    params:
+      var_limit: [10, 50]
+      mean: 0
+      p: 0.3
+
+  - name: "ISONoise"
+    params:
+      color_shift: [0.01, 0.05]
+      intensity: [0.1, 0.5]
+      p: 0.2
+
+  # Quality degradation (simulating photo conditions)
+  - name: "ImageCompression"
+    params:
+      quality_lower: 60
+      quality_upper: 100
+      compression_type: 0  # ImageCompressionType.JPEG
+      p: 0.3
+
+  - name: "Downscale"
+    params:
+      scale_min: 0.7
+      scale_max: 0.9
+      interpolation: 1
+      p: 0.2
+
+  # Grid distortion (paper wrinkles/scan artifacts)
+  - name: "GridDistortion"
+    params:
+      num_steps: 5
+      distort_limit: 0.1
+      interpolation: 1
+      border_mode: 0
+      value: 255
+      p: 0.2
+
+  - name: "ElasticTransform"
+    params:
+      alpha: 50
+      sigma: 5
+      alpha_affine: 5
+      interpolation: 1
+      border_mode: 0
+      value: 255
+      p: 0.15
+
+  # Shadow and lighting effects
+  - name: "RandomShadow"
+    params:
+      shadow_roi: [0, 0.5, 1, 1]
+      num_shadows_lower: 1
+      num_shadows_upper: 2
+      shadow_dimension: 5
+      p: 0.2
+
+# Validation augmentations (minimal, only normalization)
+validation_augmentations:
+  - name: "Normalize"
+    params:
+      mean: [0.485, 0.456, 0.406]  # ImageNet means
+      std: [0.229, 0.224, 0.225]   # ImageNet stds
+      max_pixel_value: 255.0
+
+# Test augmentations (same as validation)
+test_augmentations:
+  - name: "Normalize"
+    params:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      max_pixel_value: 255.0
+
+# Additional settings
+settings:
+  # Bounding box format for YOLO/COCO
+  bbox_format: "coco"  # [x_min, y_min, width, height]
+  
+  # Minimum visibility threshold for augmented bounding boxes
+  min_visibility: 0.3
+  
+  # Minimum area threshold (in pixels)
+  min_area: 100
+  
+  # Random seed for reproducible augmentations
+  random_seed: 42 
