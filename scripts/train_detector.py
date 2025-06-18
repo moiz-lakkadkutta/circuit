@@ -108,6 +108,11 @@ def main():
         console.print(f"   W&B enabled: {args.use_wandb}")
         console.print(f"   TensorBoard enabled: True")
         
+        # Debug: Show W&B environment variables
+        import os
+        console.print(f"   WANDB_MODE: {os.environ.get('WANDB_MODE', 'not set')}")
+        console.print(f"   WANDB_DISABLED: {os.environ.get('WANDB_DISABLED', 'not set')}")
+        
         training_config = detector.setup_training_config(
             data_config_path=data_config_path,
             experiment_name=args.experiment_name,

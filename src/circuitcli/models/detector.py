@@ -1,10 +1,17 @@
 """YOLOv8-based electrical component detector."""
 
+import os
 import torch
 import torch.nn as nn
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 import numpy as np
+
+# Disable W&B by default to prevent automatic initialization
+# This can be overridden later if W&B is explicitly requested
+os.environ.setdefault("WANDB_MODE", "disabled")
+os.environ.setdefault("WANDB_DISABLED", "true")
+
 from ultralytics import YOLO
 from ultralytics.utils.callbacks import add_integration_callbacks
 import yaml
@@ -147,14 +154,20 @@ class CircuitDetector:
             "half": False,
             "dnn": False,
             "plots": True,
-            "device": self.device,
-            # Explicitly disable W&B if not requested
-            "wandb": use_wandb
+            "device": self.device
         }
         
         # Setup experiment tracking
         if use_wandb:
+            # Re-enable W&B if explicitly requested
+            os.environ.pop("WANDB_MODE", None)
+            os.environ.pop("WANDB_DISABLED", None)
             self._setup_wandb(experiment_name)
+        else:
+            # Ensure W&B remains disabled
+            os.environ["WANDB_MODE"] = "disabled"
+            os.environ["WANDB_DISABLED"] = "true"
+            console.print("🚫 Weights & Biases disabled")
             
         if use_tensorboard:
             self._setup_tensorboard(experiment_name)
