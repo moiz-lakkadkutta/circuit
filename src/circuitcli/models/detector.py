@@ -88,7 +88,7 @@ class CircuitDetector:
                             learning_rate: float = 0.01,
                             patience: int = 50,
                             save_period: int = 10,
-                            use_wandb: bool = True,
+                            use_wandb: bool = False,
                             use_tensorboard: bool = True) -> Dict[str, Any]:
         """Setup training configuration.
         
@@ -147,7 +147,9 @@ class CircuitDetector:
             "half": False,
             "dnn": False,
             "plots": True,
-            "device": self.device
+            "device": self.device,
+            # Explicitly disable W&B if not requested
+            "wandb": use_wandb
         }
         
         # Setup experiment tracking

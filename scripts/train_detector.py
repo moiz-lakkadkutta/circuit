@@ -105,6 +105,9 @@ def main():
         
         # 3. Setup training configuration
         console.print("\n⚙️  Step 3: Setting up training configuration...")
+        console.print(f"   W&B enabled: {args.use_wandb}")
+        console.print(f"   TensorBoard enabled: True")
+        
         training_config = detector.setup_training_config(
             data_config_path=data_config_path,
             experiment_name=args.experiment_name,
