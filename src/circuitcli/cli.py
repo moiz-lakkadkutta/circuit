@@ -33,6 +33,12 @@ def models():
     pass
 
 
+@main.group()
+def extract():
+    """Extract circuit graph from detections."""
+    pass
+
+
 @dataset.command()
 @click.option("--data-dir", type=click.Path(exists=True, path_type=Path), 
               default=Path("data"), help="Data directory path")
@@ -492,6 +498,85 @@ def benchmark(onnx_path: Path, input_size: str, num_runs: int):
             
     except Exception as e:
         console.print(f"❌ Benchmark failed: {e}")
+
+
+@extract.command()
+@click.argument("detections_json", type=click.Path(exists=True, path_type=Path))
+@click.option("--image-path", type=click.Path(exists=True, path_type=Path), 
+              required=True, help="Path to original circuit image")
+@click.option("--graph", type=click.Path(path_type=Path), 
+              required=True, help="Output path for circuit graph JSON")
+@click.option("--orientations", type=click.Path(exists=True, path_type=Path),
+              help="Path to orientations JSON file")
+@click.option("--pin-templates", type=click.Path(exists=True, path_type=Path),
+              default=Path("config/pin_templates.yaml"),
+              help="Path to pin templates configuration")
+@click.option("--visualize", type=click.Path(path_type=Path),
+              help="Save graph visualization to this path")
+@click.option("--debug-dir", type=click.Path(path_type=Path),
+              help="Directory to save debug images")
+def graph(detections_json: Path, image_path: Path, graph: Path, 
+         orientations: Path, pin_templates: Path, visualize: Path, debug_dir: Path):
+    """Extract circuit graph from detections JSON."""
+    console.print("🔗 Extracting circuit graph from detections...")
+    
+    try:
+        from .models import WireDetector, GraphVisualizer, load_detections_from_json, save_graph_to_json
+        import json
+        
+        # Load detections
+        detections = load_detections_from_json(detections_json)
+        if not detections:
+            console.print("❌ No detections found")
+            return
+        
+        # Load orientations if provided
+        orientation_data = {}
+        if orientations and orientations.exists():
+            with open(orientations, 'r') as f:
+                orientation_data = json.load(f)
+        
+        # Create wire detector
+        wire_detector = WireDetector(pin_templates)
+        
+        # Create circuit graph
+        circuit_graph = wire_detector.create_circuit_graph(
+            image_path, detections, orientation_data
+        )
+        
+        # Save graph
+        graph.parent.mkdir(exist_ok=True, parents=True)
+        if save_graph_to_json(circuit_graph, graph):
+            console.print(f"✅ Circuit graph saved to {graph}")
+        
+        # Save visualization if requested
+        if visualize:
+            visualizer = GraphVisualizer()
+            visualize.parent.mkdir(exist_ok=True, parents=True)
+            if visualizer.visualize_graph(circuit_graph, visualize):
+                console.print(f"📊 Graph visualization saved to {visualize}")
+        
+        # Save debug images if requested
+        if debug_dir:
+            wire_detector.save_debug_images(debug_dir)
+        
+        # Print summary
+        console.print(f"📈 Graph Summary:")
+        console.print(f"   Total nodes: {len(circuit_graph.nodes)}")
+        console.print(f"   Total edges: {len(circuit_graph.edges)}")
+        
+        # Count node types
+        node_types = {}
+        for _, data in circuit_graph.nodes(data=True):
+            node_type = data.get('type', 'unknown')
+            node_types[node_type] = node_types.get(node_type, 0) + 1
+        
+        for node_type, count in node_types.items():
+            console.print(f"   {node_type} nodes: {count}")
+        
+    except Exception as e:
+        console.print(f"❌ Error extracting circuit graph: {e}")
+        raise
 
 
 if __name__ == "__main__":

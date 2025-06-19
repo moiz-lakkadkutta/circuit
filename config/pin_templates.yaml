@@ -1,0 +1,372 @@
+# Pin Templates for Electrical Components
+# Each component has pin locations relative to bounding box center
+# Coordinates are normalized (-1.0 to 1.0) relative to bbox half-width/height
+# Canonical orientation is 0 degrees (horizontal for 2-terminal components)
+
+# Basic 2-terminal components (horizontal orientation)
+resistor:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]  # Left terminal
+    - id: "2" 
+      pos: [0.9, 0.0]   # Right terminal
+  orientation_symmetry: 180  # Looks same at 0° and 180°
+
+variable_resistor:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]
+    - id: "2"
+      pos: [0.9, 0.0]
+    - id: "wiper"
+      pos: [0.0, -0.8]  # Wiper terminal on top
+  orientation_symmetry: null
+
+potentiometer:
+  inherit: variable_resistor
+
+capacitor:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]
+    - id: "2"
+      pos: [0.9, 0.0]
+  orientation_symmetry: 180
+
+electrolytic_capacitor:
+  pins:
+    - id: "positive"
+      pos: [-0.9, 0.0]
+    - id: "negative"
+      pos: [0.9, 0.0]
+  orientation_symmetry: null  # Polarity matters
+
+variable_capacitor:
+  inherit: capacitor
+
+inductor:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]
+    - id: "2"
+      pos: [0.9, 0.0]
+  orientation_symmetry: 180
+
+variable_inductor:
+  inherit: inductor
+
+# Voltage sources
+dc_voltage:
+  pins:
+    - id: "positive"
+      pos: [0.0, 0.8]   # Top terminal
+    - id: "negative"
+      pos: [0.0, -0.8]  # Bottom terminal
+  orientation_symmetry: null
+
+ac_voltage:
+  inherit: dc_voltage
+
+battery:
+  inherit: dc_voltage
+
+# Current sources  
+dc_current:
+  inherit: dc_voltage
+
+ac_current:
+  inherit: dc_voltage
+
+# Diodes
+diode:
+  pins:
+    - id: "anode"
+      pos: [-0.9, 0.0]
+    - id: "cathode"
+      pos: [0.9, 0.0]
+  orientation_symmetry: null
+
+zener_diode:
+  inherit: diode
+
+led:
+  inherit: diode
+
+photodiode:
+  inherit: diode
+
+# Transistors (BJT)
+npn_bjt:
+  pins:
+    - id: "collector"
+      pos: [0.0, 0.8]
+    - id: "base"
+      pos: [-0.8, 0.0]
+    - id: "emitter"
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+pnp_bjt:
+  inherit: npn_bjt
+
+# MOSFETs
+nmos:
+  pins:
+    - id: "drain"
+      pos: [0.0, 0.8]
+    - id: "gate"
+      pos: [-0.8, 0.0]
+    - id: "source"
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+pmos:
+  inherit: nmos
+
+# JFET
+jfet:
+  inherit: nmos
+
+# Operational Amplifiers
+opamp:
+  pins:
+    - id: "v+"
+      pos: [-0.8, 0.4]   # Non-inverting input
+    - id: "v-"
+      pos: [-0.8, -0.4]  # Inverting input
+    - id: "out"
+      pos: [0.8, 0.0]    # Output
+    - id: "vcc"
+      pos: [0.0, 0.8]    # Positive supply
+    - id: "vee"
+      pos: [0.0, -0.8]   # Negative supply
+  orientation_symmetry: null
+
+comparator:
+  inherit: opamp
+
+buffer:
+  pins:
+    - id: "in"
+      pos: [-0.8, 0.0]
+    - id: "out"
+      pos: [0.8, 0.0]
+    - id: "vcc"
+      pos: [0.0, 0.8]
+    - id: "vee" 
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+# Logic Gates (2-input)
+and_gate:
+  pins:
+    - id: "a"
+      pos: [-0.8, 0.3]
+    - id: "b"
+      pos: [-0.8, -0.3]
+    - id: "out"
+      pos: [0.8, 0.0]
+    - id: "vcc"
+      pos: [0.0, 0.8]
+    - id: "gnd"
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+or_gate:
+  inherit: and_gate
+
+nand_gate:
+  inherit: and_gate
+
+nor_gate:
+  inherit: and_gate
+
+xor_gate:
+  inherit: and_gate
+
+not_gate:
+  pins:
+    - id: "in"
+      pos: [-0.8, 0.0]
+    - id: "out"
+      pos: [0.8, 0.0]
+    - id: "vcc"
+      pos: [0.0, 0.8]
+    - id: "gnd"
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+# Switches
+switch:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]
+    - id: "2"
+      pos: [0.9, 0.0]
+  orientation_symmetry: 180
+
+relay:
+  pins:
+    - id: "coil_1"
+      pos: [-0.8, 0.6]
+    - id: "coil_2"
+      pos: [-0.8, -0.6]
+    - id: "common"
+      pos: [0.8, 0.0]
+    - id: "no"
+      pos: [0.8, 0.4]   # Normally open
+    - id: "nc"
+      pos: [0.8, -0.4]  # Normally closed
+  orientation_symmetry: null
+
+push_button:
+  inherit: switch
+
+# Measuring Instruments
+voltmeter:
+  pins:
+    - id: "positive"
+      pos: [0.0, 0.8]
+    - id: "negative"
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+ammeter:
+  inherit: voltmeter
+
+oscilloscope:
+  pins:
+    - id: "ch1"
+      pos: [-0.6, 0.8]
+    - id: "ch2"
+      pos: [0.6, 0.8]
+    - id: "gnd"
+      pos: [0.0, -0.8]
+  orientation_symmetry: null
+
+# Connection Elements
+ground:
+  pins:
+    - id: "terminal"
+      pos: [0.0, 0.8]
+  orientation_symmetry: 90
+
+terminal:
+  pins:
+    - id: "connection"
+      pos: [0.0, 0.0]
+  orientation_symmetry: 90
+
+# Wire connection points (detected but not components)
+junction:
+  pins:
+    - id: "node"
+      pos: [0.0, 0.0]
+  orientation_symmetry: 90
+
+crossover:
+  pins: []  # No electrical connections
+  orientation_symmetry: 90
+
+# Complex Components
+timer_555:
+  pins:
+    - id: "gnd"
+      pos: [-0.8, -0.6]
+    - id: "trigger"
+      pos: [-0.8, -0.2]
+    - id: "output"
+      pos: [-0.8, 0.2]
+    - id: "reset"
+      pos: [-0.8, 0.6]
+    - id: "control"
+      pos: [0.8, 0.6]
+    - id: "threshold"
+      pos: [0.8, 0.2]
+    - id: "discharge"
+      pos: [0.8, -0.2]
+    - id: "vcc"
+      pos: [0.8, -0.6]
+  orientation_symmetry: null
+
+microcontroller:
+  # Generic microcontroller - real implementation would need specific pinouts
+  pins:
+    - id: "pin_1"
+      pos: [-0.8, 0.7]
+    - id: "pin_2"
+      pos: [-0.8, 0.3]
+    - id: "pin_3"
+      pos: [-0.8, -0.3]
+    - id: "pin_4"
+      pos: [-0.8, -0.7]
+    - id: "pin_5"
+      pos: [0.8, -0.7]
+    - id: "pin_6"
+      pos: [0.8, -0.3]
+    - id: "pin_7"
+      pos: [0.8, 0.3]
+    - id: "pin_8"
+      pos: [0.8, 0.7]
+  orientation_symmetry: null
+
+# Miscellaneous
+fuse:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]
+    - id: "2"
+      pos: [0.9, 0.0]
+  orientation_symmetry: 180
+
+crystal:
+  pins:
+    - id: "1"
+      pos: [-0.9, 0.0]
+    - id: "2"
+      pos: [0.9, 0.0]
+  orientation_symmetry: 180
+
+antenna:
+  pins:
+    - id: "feed"
+      pos: [0.0, -0.8]
+  orientation_symmetry: 90
+
+speaker:
+  pins:
+    - id: "positive"
+      pos: [-0.8, 0.0]
+    - id: "negative"
+      pos: [0.8, 0.0]
+  orientation_symmetry: null
+
+microphone:
+  inherit: speaker
+
+# Transformer
+transformer:
+  pins:
+    - id: "primary_1"
+      pos: [-0.8, 0.4]
+    - id: "primary_2"
+      pos: [-0.8, -0.4]
+    - id: "secondary_1"
+      pos: [0.8, 0.4]
+    - id: "secondary_2"
+      pos: [0.8, -0.4]
+  orientation_symmetry: null
+
+# Memory
+memory:
+  # Generic memory chip
+  pins:
+    - id: "vcc"
+      pos: [0.0, 0.8]
+    - id: "gnd"
+      pos: [0.0, -0.8]
+    - id: "data"
+      pos: [-0.8, 0.0]
+    - id: "address"
+      pos: [0.8, 0.0]
+  orientation_symmetry: null 
