@@ -60,7 +60,7 @@ names:
   58: block
   59: unknown
 nc: 60
-path: /Users/shrutikhule/Moiz/circuit2/data/processed/yolo_format
+path: /Users/genai_inkubator/M/circuit/data/processed/yolo_format
 test: images/test
 train: images/train
 val: images/val
