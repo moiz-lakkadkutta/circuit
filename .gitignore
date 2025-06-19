@@ -74,11 +74,7 @@ Desktop.ini
 .dvc/plots
 
 # ML/AI specific
-*.onnx
-*.pt
-*.pth
-*.pkl
-*.joblib
+
 wandb/
 mlruns/
 logs/
