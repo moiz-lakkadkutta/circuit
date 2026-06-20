@@ -221,6 +221,17 @@ numerically but FAILED is the worst outcome).
 
 ---
 
+## Security
+
+trustguard runs ngspice in batch mode on the netlists you give it. A SPICE
+netlist can contain `.control`/`shell` directives that execute arbitrary shell
+commands — so **only run trustguard on netlists you trust** (treat them with
+the same caution as running an arbitrary script). The printed log may include
+output emitted by such directives. trustguard does not sanitize or restrict
+ngspice's execution environment.
+
+---
+
 ## Limitations (honest scope)
 
 - **Parser scope:** The static netlist parser covers the element types listed in

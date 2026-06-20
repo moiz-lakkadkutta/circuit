@@ -18,9 +18,6 @@ from pathlib import Path
 from trustguard.checks import Issue
 from trustguard.netlist import NODE_COUNT
 
-# Severity set that downgrades verdict from TRUSTWORTHY to SUSPECT.
-_TRUST_BREAKING = {"FATAL", "SILENT", "WARN"}
-
 # Ground-ish net names that KiCad commonly uses instead of the required node '0'.
 # Checked case-insensitively against node tokens found in the netlist.
 _GROUND_NETS = {"GND", "GNDA", "0V", "VSS", "AGND", "DGND", "PGND"}
@@ -101,11 +98,17 @@ def check_kicad_netlist(path_or_text, ngspice_path=None):
     """
     # Lazy import to keep kicad.py importable without pulling in the full
     # core/ngspice stack at module load time (useful in KiCad Python console).
-    from trustguard.core import evaluate
+    from trustguard.core import evaluate, verdict_from
     from trustguard import formats as _formats
 
     p = Path(str(path_or_text))
-    if p.exists() and p.is_file():
+    try:
+        _is_file = p.exists() and p.is_file()
+    except OSError:
+        # path_or_text contains characters that are invalid as a filesystem path
+        # (e.g. newlines in raw netlist text on Python 3.13+).
+        _is_file = False
+    if _is_file:
         # Use load_as_netlist so that convertible inputs (e.g. .asc) are
         # preflight-checked against the same normalised text that evaluate()
         # actually analyses, not the unconverted raw file bytes.
@@ -129,13 +132,8 @@ def check_kicad_netlist(path_or_text, ngspice_path=None):
             if pi.code not in existing_codes:
                 result.issues.insert(0, pi)
                 existing_codes.add(pi.code)
-        # Recalculate verdict with the augmented issue list.
-        trust_breaking = any(i.severity in _TRUST_BREAKING for i in result.issues)
-        if result.rc != 0:
-            result.verdict = "FAILED"
-        elif trust_breaking:
-            result.verdict = "SUSPECT"
-        else:
-            result.verdict = "TRUSTWORTHY"
+        # Recalculate verdict with the augmented issue list using the
+        # single shared helper from core (no local duplication).
+        result.verdict = verdict_from(result.rc, result.issues)
 
     return result
