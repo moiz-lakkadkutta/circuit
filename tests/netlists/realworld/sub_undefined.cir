@@ -1,0 +1,5 @@
+* sub_undefined: X referencing a missing subckt definition
+V1 A 0 5
+XFOO A 0 NOSUCHSUBCKT
+.op
+.end

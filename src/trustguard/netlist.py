@@ -1,6 +1,7 @@
 """
 Netlist parsing and DC-topology helpers.
 """
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +21,10 @@ class Element:
 
     @property
     def kind(self):
-        return self.refdes[0].upper()
+        # Strip any namespace prefix (e.g. "X1:C1" -> "C1") so that flattened
+        # elements report their actual element type, not the instance prefix.
+        base = self.refdes.rsplit(":", 1)[-1]
+        return base[0].upper()
 
 
 def parse_netlist(text):
@@ -47,13 +51,275 @@ def parse_netlist(text):
 
 
 def parse_and_flatten(text, base_dir):
-    """Parse netlist and return (elements, node_elems, parse_issues).
+    """Parse netlist with subcircuit flattening.
 
-    base_dir is a Path; ignored for now (reserved for future subcircuit resolution).
-    parse_issues is always [] in this implementation.
+    Returns (elements, node_elems, parse_issues).
+
+    Handles:
+    - AC-B1: continuation lines ('+')
+    - AC-B2: .subckt/.ends block collection and X-instance flattening with namespacing
+    - AC-B3: port count mismatch detection
+    - AC-B4: .include file resolution (local files only)
+    - AC-B5: soundness — subckt DC paths propagate; internal floating nodes caught
+    - AC-B6: undefined subckt detection
+    - Recursion guard for self/mutual referencing subckts
     """
-    elements, node_elems, _title = parse_netlist(text)
-    return elements, node_elems, []
+    # Lazy import to avoid circular import (checks imports from netlist).
+    def _make_issue(severity, code, message):
+        try:
+            from trustguard.checks import Issue  # noqa: PLC0415
+        except ImportError:
+            from dataclasses import make_dataclass
+            Issue = make_dataclass("Issue", ["severity", "code", "message"])
+        return Issue(severity, code, message)
+
+    parse_issues = []
+    base_dir = Path(base_dir)
+
+    # --- Step 1: load text, handle .include, rejoin continuation lines -----------
+
+    def _load_lines(src_text, src_dir, visited=None):
+        """Rejoin continuation lines and splice .include content.
+
+        Returns a flat list of preprocessed line strings.
+        """
+        if visited is None:
+            visited = set()
+
+        # Rejoin '+' continuation lines first.
+        # Per SPICE spec, '+' continues the previous non-comment logical line.
+        # Do NOT append onto a comment line (starting with '*').
+        raw_lines = []
+        for line in src_text.splitlines():
+            s = line.strip()
+            if s.startswith("+") and raw_lines and not raw_lines[-1].startswith("*"):
+                raw_lines[-1] = raw_lines[-1] + " " + s[1:].strip()
+            else:
+                raw_lines.append(s)
+
+        # Process .include directives.
+        # Match ".include" or ".inc" as whole directive tokens (word-boundary)
+        # to avoid over-matching directives like ".initial", ".incantation", etc.
+        result = []
+        for line in raw_lines:
+            sl = line.lower()
+            if re.match(r'\.(include|inc)\b', sl):
+                m = re.match(r'\.inc(?:lude)?\s+"?([^"\s]+)"?', line, re.I)
+                if m:
+                    fname = m.group(1).strip()
+                    if re.match(r'https?://', fname, re.I) or re.match(r'ftp://', fname, re.I):
+                        parse_issues.append(_make_issue("WARN", "include_url",
+                            f".include '{fname}' looks like a URL; skipping."))
+                        continue
+                    inc_path = (src_dir / fname).resolve()
+                    if inc_path in visited:
+                        parse_issues.append(_make_issue("WARN", "include_cycle",
+                            f".include '{fname}' already included; skipping cycle."))
+                        continue
+                    try:
+                        inc_text = inc_path.read_text()
+                        visited.add(inc_path)
+                        result.extend(_load_lines(inc_text, inc_path.parent, visited))
+                    except (OSError, IOError) as exc:
+                        parse_issues.append(_make_issue("WARN", "missing_include",
+                            f".include '{fname}' could not be read: {exc}"))
+                    continue
+            result.append(line)
+        return result
+
+    all_lines = _load_lines(text, base_dir)
+
+    # --- Step 2: collect .subckt definitions ------------------------------------
+
+    def _collect_defs(lines):
+        """Extract .subckt/.ends blocks.
+
+        Returns (defs, remaining_lines).
+        defs maps SUBCKT_NAME -> {'ports': [str, ...], 'body': [str, ...]}.
+        remaining_lines is the list of lines outside any .subckt block.
+        """
+        defs = {}
+        remaining = []
+        nesting = 0
+        current_name = None
+        current_ports = []
+        current_body = []
+
+        for line in lines:
+            sl = line.lower().strip()
+            if sl.startswith(".subckt"):
+                nesting += 1
+                if nesting == 1:
+                    toks = line.split()
+                    current_name = toks[1].upper() if len(toks) > 1 else ""
+                    current_ports = [p.upper() for p in toks[2:]]
+                    current_body = []
+                else:
+                    # nested .subckt inside body — keep for body
+                    current_body.append(line)
+            elif sl.startswith(".ends"):
+                if nesting > 0:
+                    nesting -= 1
+                    if nesting == 0:
+                        defs[current_name] = {
+                            "ports": current_ports,
+                            "body": current_body,
+                        }
+                        current_name = None
+                        current_ports = []
+                        current_body = []
+                    else:
+                        current_body.append(line)
+                # stray .ends outside any .subckt: ignore
+            elif nesting > 0:
+                current_body.append(line)
+            else:
+                remaining.append(line)
+
+        return defs, remaining
+
+    defs, top_lines = _collect_defs(all_lines)
+
+    # --- Step 3: node mapping helper --------------------------------------------
+
+    def _map_node(node, port_map, instance_name):
+        """Map a single node name for a flattened instance.
+
+        Ground '0' is always preserved.
+        Ports map to their corresponding external node.
+        Internal nodes are namespaced as 'instance_name:node'.
+        """
+        if node == "0":
+            return "0"
+        upper = node.upper()
+        if upper in port_map:
+            return port_map[upper]
+        return f"{instance_name}:{node}" if instance_name else node
+
+    # --- Step 4: recursive body flattener ---------------------------------------
+
+    def _flatten_body(body_lines, port_map, instance_name, ancestor_chain):
+        """Flatten a subckt body into Element objects.
+
+        port_map: {PORT_UPPER: external_node_str}
+        instance_name: str used to namespace internal nodes
+        ancestor_chain: frozenset of subckt names being expanded (cycle guard)
+        """
+        flat = []
+        for line in body_lines:
+            s = line.strip()
+            if not s or s[0] in "*.":
+                continue
+            toks = s.split()
+            first_upper = toks[0][0].upper()
+
+            if toks[0][0].upper() == "X":
+                # Nested X-instance inside subckt body.
+                if len(toks) < 3:
+                    continue
+                xname = toks[0]
+                sub_ref = toks[-1].upper()
+                ext_raw = toks[1:-1]
+                # Map the external nodes through the current port_map.
+                ext_nodes = [_map_node(n, port_map, instance_name) for n in ext_raw]
+
+                if sub_ref in ancestor_chain:
+                    parse_issues.append(_make_issue("WARN", "subckt_recursion",
+                        f"Subckt recursion: '{sub_ref}' is an ancestor of "
+                        f"instance '{xname}'. Skipping."))
+                    continue
+
+                if sub_ref not in defs:
+                    parse_issues.append(_make_issue("WARN", "undefined_subckt",
+                        f"Instance '{xname}' references undefined subckt '{sub_ref}'."))
+                    continue
+
+                sub_def = defs[sub_ref]
+                sub_ports = sub_def["ports"]
+                if len(ext_nodes) != len(sub_ports):
+                    parse_issues.append(_make_issue("WARN", "port_mismatch",
+                        f"Instance '{xname}' of '{sub_ref}' provides "
+                        f"{len(ext_nodes)} nodes but subckt declares "
+                        f"{len(sub_ports)} ports."))
+                    continue
+
+                nested_port_map = dict(zip(sub_ports, ext_nodes))
+                nested_name = f"{instance_name}:{xname}" if instance_name else xname
+                nested_chain = ancestor_chain | frozenset([sub_ref])
+
+                flat.extend(_flatten_body(
+                    sub_def["body"], nested_port_map, nested_name, nested_chain
+                ))
+            else:
+                # Regular element in subckt body.
+                n = NODE_COUNT.get(first_upper)
+                if n is None or len(toks) < 1 + n:
+                    continue
+                mapped = [_map_node(nd, port_map, instance_name)
+                          for nd in toks[1:1 + n]]
+                # Namespace the refdes with the instance name so that two
+                # instances of the same subckt never produce colliding refdes
+                # (which would cause set-collapse in node_elems and spurious
+                # dangling_node / undercounting).
+                namespaced_refdes = (
+                    f"{instance_name}:{toks[0]}" if instance_name else toks[0]
+                )
+                flat.append(Element(namespaced_refdes, mapped, s))
+        return flat
+
+    # --- Step 5: parse top-level lines ------------------------------------------
+
+    elements = []
+    node_elems = defaultdict(set)
+
+    for line in top_lines:
+        s = line.strip()
+        if not s or s[0] in "*.":
+            continue
+        toks = s.split()
+        first_upper = toks[0][0].upper()
+
+        if first_upper == "X":
+            # Top-level X-instance.
+            if len(toks) < 3:
+                parse_issues.append(_make_issue("WARN", "undefined_subckt",
+                    f"Instance '{toks[0]}' has too few tokens to parse."))
+                continue
+            xname = toks[0]
+            sub_ref = toks[-1].upper()
+            ext_nodes = toks[1:-1]
+
+            if sub_ref not in defs:
+                parse_issues.append(_make_issue("WARN", "undefined_subckt",
+                    f"Instance '{xname}' references undefined subckt '{sub_ref}'."))
+                continue
+
+            sub_def = defs[sub_ref]
+            sub_ports = sub_def["ports"]
+            if len(ext_nodes) != len(sub_ports):
+                parse_issues.append(_make_issue("WARN", "port_mismatch",
+                    f"Instance '{xname}' of '{sub_ref}' provides "
+                    f"{len(ext_nodes)} nodes but subckt declares "
+                    f"{len(sub_ports)} ports."))
+                continue
+
+            port_map = {p: ext_nodes[i] for i, p in enumerate(sub_ports)}
+            ancestor_chain = frozenset([sub_ref])
+
+            for el in _flatten_body(sub_def["body"], port_map, xname, ancestor_chain):
+                elements.append(el)
+                for nd in el.nodes:
+                    node_elems[nd].add(el.refdes)
+        else:
+            n = NODE_COUNT.get(first_upper)
+            if n is None or len(toks) < 1 + n:
+                continue
+            el = Element(toks[0], toks[1:1 + n], s)
+            elements.append(el)
+            for nd in el.nodes:
+                node_elems[nd].add(el.refdes)
+
+    return elements, node_elems, parse_issues
 
 
 # Element kinds that pass DC current (provide a galvanic reference path).

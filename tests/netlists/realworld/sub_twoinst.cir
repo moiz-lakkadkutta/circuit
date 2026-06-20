@@ -1,0 +1,11 @@
+* sub_twoinst: two instances of same subckt RES sharing node MID
+* X1 A -> MID, X2 MID -> 0
+* After flattening MID must connect to X1:R1 AND X2:R1 (no spurious dangling_node)
+.subckt RES port1 port2
+R1 port1 port2 1k
+.ends RES
+V1 A 0 5
+X1 A MID RES
+X2 MID 0 RES
+.op
+.end

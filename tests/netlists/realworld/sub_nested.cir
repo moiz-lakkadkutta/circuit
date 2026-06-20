@@ -1,0 +1,11 @@
+* sub_nested: a subckt that instantiates another subckt
+.subckt INNER pa pb
+R1 pa pb 100
+.ends INNER
+.subckt OUTER p1 p2
+XINN p1 p2 INNER
+.ends OUTER
+V1 net1 0 5
+XOUTER1 net1 0 OUTER
+.op
+.end

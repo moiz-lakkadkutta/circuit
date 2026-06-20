@@ -1,0 +1,10 @@
+* sub_floating: subckt has an internal node only through caps -> no_dc_path on internal node
+.subckt CAPBLOCK port1 port2
+C1 port1 internal 1u
+C2 internal port2 1u
+.ends CAPBLOCK
+V1 A 0 5
+R1 A 0 1k
+XCAP1 A 0 CAPBLOCK
+.op
+.end
