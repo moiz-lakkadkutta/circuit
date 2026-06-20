@@ -1,0 +1,9 @@
+* sub_dcpath: X-instance whose subckt provides DC path to ground
+* External node A should NOT get no_dc_path after flattening
+.subckt MYRES port1 port2
+R1 port1 port2 1k
+.ends MYRES
+V1 A 0 5
+XRES1 A 0 MYRES
+.op
+.end
