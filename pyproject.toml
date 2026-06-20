@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trustguard"
+version = "0.1.0"
+description = "Answer one question about a SPICE run: can I trust this result?"
+requires-python = ">=3.9"
+
+[project.scripts]
+trustguard = "trustguard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
