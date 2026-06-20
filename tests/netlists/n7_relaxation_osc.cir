@@ -1,0 +1,15 @@
+* N7: ideal-comparator relaxation oscillator with near-zero hysteresis
+* Expected failure mode: "Timestep too small" from chattering switch
+.model SW SW(Ron=1 Roff=1g Vt=0 Vh=1n)
+v1 vdd 0 5
+* comparator: switch driven by cap voltage vs reference, positive feedback
+s1 vdd out cap fb SW
+r1 out cap 1k
+c1 cap 0 1n
+e1 fb 0 out 0 0.5
+rload out 0 10k
+.tran 1n 100u uic
+.control
+run
+.endc
+.end

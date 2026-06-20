@@ -1,0 +1,12 @@
+* N4: behavioral source dividing by a node that passes through zero
+* Expected failure mode: divide-by-zero / no convergence in transient
+v1 1 0 SIN(0 5 1k)
+r1 1 0 1k
+* b-source computes 1/v(1), singular when the sine crosses zero
+b1 2 0 V=1/V(1)
+r2 2 0 1k
+.tran 1u 2m
+.control
+run
+.endc
+.end

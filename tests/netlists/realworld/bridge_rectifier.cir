@@ -1,0 +1,16 @@
+* Real-world: full-wave bridge rectifier with 470uF smoothing cap + load
+* The 'out' node is fed by a large cap to ground, but ALSO has a DC path via
+* rload — the acid test that no_dc_path does not false-fire on smoothing caps.
+vin a b SIN(0 17 60)
+d1 a out D
+d2 b out D
+d3 0 a D
+d4 0 b D
+csmooth out 0 470u
+rload out 0 1k
+.model D D(Is=1e-14 N=1.7)
+.tran 100u 50m
+.control
+run
+.endc
+.end

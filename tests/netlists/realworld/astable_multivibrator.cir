@@ -1,0 +1,19 @@
+* Real-world: classic BJT astable multivibrator (square-wave oscillator)
+* Famous SPICE gotcha: the perfectly symmetric circuit can settle at its
+* (unstable) DC equilibrium and never oscillate without an asymmetry or .ic.
+* Numerically valid, but may not do what the user wants — a good honesty test.
+vcc vcc 0 5
+rc1 vcc c1 1k
+rc2 vcc c2 1k
+rb1 vcc b1 47k
+rb2 vcc b2 47k
+cc1 c1 b2 10n
+cc2 c2 b1 10n
+q1 c1 b1 0 QNPN
+q2 c2 b2 0 QNPN
+.model QNPN NPN(Is=1e-14 Bf=100)
+.tran 10u 5m
+.control
+run
+.endc
+.end

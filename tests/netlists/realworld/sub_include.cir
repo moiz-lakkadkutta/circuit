@@ -1,0 +1,6 @@
+* sub_include: uses .include to bring in subckt definitions
+.include "sub_models.inc"
+V1 IN 0 5
+XDIV1 IN MID 0 DIVIDER
+.op
+.end

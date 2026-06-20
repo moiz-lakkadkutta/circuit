@@ -1,0 +1,10 @@
+.title KiCad Export - GND Net Not Mapped to Node 0 (TrustGuard T5 fixture)
+* KiCad net name GND is NOT mapped to ngspice node 0.
+* kicad_preflight must emit kicad_ground_not_zero WARN.
+* Expected: SUSPECT (WARN from preflight; ngspice will also fail no_ground)
+
+V1 VIN GND DC 5
+R1 VIN OUT 10k
+R2 OUT GND 1k
+.op
+.end

@@ -1,0 +1,14 @@
+.title KiCad Export - Voltage Divider with Subckt (TrustGuard T5 fixture)
+* Ground as node 0 (correct for ngspice).
+* RMOD subckt exercises X-instance + inline .subckt parsing (Feature B end-to-end).
+* Expected verdict: TRUSTWORTHY
+
+.subckt RMOD p1 p2
+R1 p1 p2 10k
+.ends RMOD
+
+V1 VIN 0 DC 5
+XR1 VIN MID RMOD
+XR2 MID 0 RMOD
+.op
+.end

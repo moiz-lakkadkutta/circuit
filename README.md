@@ -1,150 +1,274 @@
-# CircuitCLI – Image‑to‑Simulation Tool
+# circuit / trustguard
 
-## 1  Purpose & Vision
+This repo started as **CircuitCLI**, an image/photo-to-SPICE-simulation pipeline
+(YOLO + OCR + graph → ngspice). That idea was dropped after research showed the
+problem it targeted ("redrawing schematics") isn't a pain users actually report,
+and the obvious adjacent gaps were already taken or funded.
 
-CircuitCLI turns a **photographed or hand‑drawn electrical circuit** into a fully solvable digital twin.  In a single command‑line workflow the tool will:
-
-1. **Detect** every component, junction, and text label in the image.
-2. **Build** a graph or SPICE netlist that captures node connectivity and component values.
-3. **Simulate** the circuit (DC, AC, transient) via ngspice/PySpice.
-
-The goal is a reproducible pipeline that shortens idea‑to‑analysis time for engineers, educators, and hobbyists.
+It is now exploring a different, evidence-led direction: a **SPICE result
+trust-guard**.
 
 ---
 
-## 2  Problem Statement
+## What is trustguard?
 
-Today users manually redraw schematics in EDA suites before they can run analyses—slow, error‑prone, and inaccessible on the go. CircuitCLI removes that bottleneck by *automating* the translation from pixels to equations.
+Modern ngspice recovers from many classic convergence problems on its own — and
+when it can't, it often returns **exit code 0 with a plausible but wrong answer**
+(a relaxed fallback estimate, or arbitrary voltages on an ungrounded node).
+Nothing in the standard flow warns you.
+
+`trustguard` answers one question about a SPICE run: **can I trust this result?**
+
+It combines static netlist analysis, ngspice failure-log decoding (cryptic
+internal names translated to the real component plus a specific fix), and
+silent-failure detection (exit-0 runs that are still untrustworthy). It accepts
+netlists from ngspice, KiCad, LTspice, and PSpice, and can convert LTspice `.asc`
+schematics (experimental, built-in 2-pin symbols only).
 
 ---
 
-## 3  Scope
+## Install
 
-| In‑scope                                            | Out‑of‑scope                          |
-| --------------------------------------------------- | ------------------------------------- |
-| Hand‑drawn & printed schematics (single page)       | Multi‑sheet or hierarchical designs   |
-| 45 symbol classes (+ junction, crossover, terminal) | Complex IC footprints like BGA or QFP |
-| DC, AC, transient analyses                          | RF, Monte‑Carlo, temperature sweeps   |
-| CLI & Docker delivery                               | Full GUI editor                       |
+**Requirements:** Python 3.9+, ngspice
 
----
-
-## 4  High‑Level Architecture
-
-```
-      +-------------+     bboxes/json      +-------------+
- image→| Detector &  | ───────────────▶ | Wire/Graph   |
-       |  OCR (DL)  |                    |  Assembly    |
-      +-------------+                    +------+------+
-                                                | graph/netlist
-                                                ▼
-                                +--------------+-------------+
-                                |  Simulation (ngspice)     |
-                                +--------------+-------------+
-                                                | waveforms/CSV/PNG
-                                                ▼
-                                         User / CI pipeline
+```bash
+brew install ngspice          # macOS; Linux: apt install ngspice
 ```
 
-**Data flow**: raw image → ML inference (YOLOv8‑seg + OCR) → skeleton tracing → NetworkX graph → SPICE netlist → PySpice simulation.
+**Install from the repo:**
+
+```bash
+pip install .
+```
+
+This registers a `trustguard` command on your PATH. Alternatively, run directly
+without installing (useful during development):
+
+```bash
+PYTHONPATH=src python3 -m trustguard FILE...
+```
 
 ---
 
-## 5  Core Components
+## ngspice path resolution (priority order)
 
-| Layer                      | Responsibilities                                      | Key Tech                          |
-| -------------------------- | ----------------------------------------------------- | --------------------------------- |
-| **Dataset & Augmentation** | Store raw and synthetic images, split, augment        | DVC, Albumentations               |
-| **Detection & OCR**        | Detect symbols, text, junctions; classify orientation | PyTorch/YOLOv8‑seg, EasyOCR/TrOCR |
-| **Graph Builder**          | Extract skeleton, construct connectivity graph        | OpenCV, NetworkX                  |
-| **Netlist Generator**      | Map graph to SPICE primitives                         | Custom YAML mapping               |
-| **Simulation Engine**      | Run DC/AC/transient analyses                          | PySpice (ngspice backend)         |
-| **CLI & Packaging**        | Expose features, progress bars, installation          | click, rich/tqdm, Poetry + pipx   |
-| **CI/CD & DevOps**         | Lint, test, Docker, model caching                     | GitHub Actions, Ruff, mypy        |
+trustguard locates the ngspice binary in this order:
 
----
+1. `--ngspice PATH` CLI flag — if given and not executable, raises an error immediately (no fallthrough)
+2. `$NGSPICE` environment variable — same hard-configured semantics; error if set but not usable
+3. `which ngspice` (PATH lookup)
+4. Legacy fallback `/opt/homebrew/bin/ngspice`
 
-## 6  Project Phases (Epics)
+If none of the above resolves to a usable binary, trustguard exits with code **3**
+and prints a clear message listing what was tried. Install ngspice, or point to it
+explicitly:
 
-1. **Dataset Audit & Preparation** – Version raw data, create COCO JSON, synthesize printed schematics.
-2. **Detection & OCR Models** – Train YOLOv8‑seg, export ONNX, integrate OCR & orientation.
-3. **Wire Detection & Graph Assembly** – Skeletonise image, build NetworkX graph, visualise.
-4. **Netlist Generation** – YAML mapping, writer, user overrides.
-5. **Simulation Integration** – Docker with ngspice, wrapper for DC/AC/transient, plotting helper.
-6. **CLI Packaging & UX** – click multi‑command app, progress bars, pipx/Docker release.
-7. **Quality Engineering & CI/CD** – Actions for lint/tests, artefact caching, CODEOWNERS.
-8. **Validation, Docs & Release** – Benchmark, user guide, GitHub Release v0.1.0.
+```bash
+trustguard --ngspice /usr/local/bin/ngspice mynetlist.cir
+# or
+export NGSPICE=/usr/local/bin/ngspice
+```
 
 ---
 
-## 7  Technology Stack
+## CLI usage
 
-* **Languages**: Python 3.12, (bash for helpers)
-* **ML Frameworks**: PyTorch 2.x, Ultralytics YOLOv8, ONNX Runtime
-* **Vision & Graph**: OpenCV, Albumentations, NetworkX, Graphviz
-* **Simulation**: ngspice 36+, PySpice 1.5+
-* **CLI & UX**: click, rich, tqdm, matplotlib
-* **DevOps**: Docker, GitHub Actions, DVC, Poetry
+```
+trustguard [--ngspice PATH] [--version] [--help] FILE...
+trustguard kicad [--ngspice PATH] FILE...
+```
 
----
+Pass one or more netlist (or schematic) files. When multiple files are given,
+trustguard evaluates each in sequence and exits with the worst verdict across all.
 
-## 8  Key Deliverables
+### Options
 
-1. **`circuitcli` CLI package** (pipx & Docker)
-2. Pre‑trained **ONNX model** (≈20 MB) for offline inference
-3. **Documentation site** (MkDocs / GitHub Pages) with a worked tutorial
-4. **Benchmark report** covering detection mAP, graph accuracy, simulation fidelity
-5. **v0.1.0 GitHub Release** with changelog and usage examples
+| Flag | Description |
+|------|-------------|
+| `FILE...` | One or more netlist or schematic files to check |
+| `--ngspice PATH` | Explicit path to the ngspice binary |
+| `--version` | Print version and exit |
+| `--help` | Show usage |
 
----
+### Exit codes
 
-## 9  Success Metrics
+| Code | Meaning |
+|------|---------|
+| 0 | TRUSTWORTHY — ngspice exited 0 and no trust issues found |
+| 1 | FAILED — ngspice exited non-zero |
+| 2 | SUSPECT — ngspice exited 0 but trust issues were detected |
+| 3 | ngspice not found |
+| 64 | Usage error (bad arguments) |
 
-| Metric                                     | Target                      |
-| ------------------------------------------ | --------------------------- |
-| Detection mAP‑50                           | ≥ 0.60 on validation set    |
-| Graph connectivity accuracy                | ≥ 95 % junction correctness |
-| OCR component‑value accuracy               | ≥ 90 %                      |
-| Simulation match (RMS error vs golden)     | ≤ 5 %                       |
-| End‑to‑end CLI runtime (1080 × 1920 image) | ≤ 8 s on laptop CPU         |
+### Example
 
----
+```
+$ PYTHONPATH=src python3 -m trustguard tests/netlists/n5_healthy_control.cir
 
-## 10  Timeline Snapshot (12 weeks)
+======================================================================
+n5_healthy_control.cir
+======================================================================
+✓  TRUSTWORTHY   (ngspice exit 0)
 
-* **Wk 1–2** Dataset & augments
-* **Wk 3–5** Detector/ocr training
-* **Wk 6–7** Graph assembly
-* **Wk 8** Netlist
-* **Wk 9** Simulation
-* **Wk 10** CLI & CI
-* **Wk 11–12** Benchmarks, docs, release
+  No trust issues detected.
+```
 
----
+```
+$ PYTHONPATH=src python3 -m trustguard tests/netlists/n1_missing_ground.cir
 
-## 11  Stakeholders & Roles
+======================================================================
+n1_missing_ground.cir
+======================================================================
+⚠  SUSPECT   (ngspice exit 0)
 
-| Role                  | Responsibility                            |
-| --------------------- | ----------------------------------------- |
-| **ML Engineer** (you) | Model training, integration, benchmarking |
-| Software Engineer     | Graph, netlist, CLI implementation        |
-| DevOps                | Docker, CI/CD, release automation         |
-| Tech Writer           | Documentation, tutorials                  |
-| Product Lead          | Scope alignment, success criteria         |
-
----
-
-## 12  Glossary
-
-| Term                | Definition                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| **SPICE**           | Simulation Program with Integrated Circuit Emphasis, de‑facto standard netlist format |
-| **COCO JSON**       | Common object‑detection annotation schema                                             |
-| **Skeletonisation** | Morphological thinning of binary image to 1‑pixel‑wide lines                          |
-| **Netlist**         | Text description of circuit components and node connections                           |
+  [FATAL] no_ground
+  → No node '0' (ground). SPICE has no voltage reference, so it may float the circuit and return arbitrary WRONG voltages with no error. Fix: tie a reference node to '0'.
+```
 
 ---
 
-### TL;DR
+## Input formats
 
-CircuitCLI is an open‑source **image‑to‑simulation pipeline**. Snap a photo of a schematic, run a single command, and get solved waveforms—powered by YOLO, OCR, graph analysis, and ngspice.
+| Extension | Handling |
+|-----------|----------|
+| `.cir`, `.net`, `.sp`, `.spice`, `.ckt` | Passed directly to ngspice |
+| Any other netlist | ngspice natively translates KiCad, LTspice, PSpice, HSpice dialects |
+| `.asc` | Converted in-process (experimental — see below) |
+
+**LTspice `.asc` (experimental):** trustguard converts `.asc` schematics using
+built-in 2-pin symbol geometry (resistor, capacitor, inductor, diode, voltage
+source, current source). Net connectivity is recovered by union-find over
+wire/pin/flag coordinates. For anything beyond these built-in symbols, export
+the netlist from LTspice ("View > SPICE Netlist") and feed that instead — that
+path is exact. When a `.asc` is evaluated, the generated netlist is printed at
+the end of the report so you can compare it against LTspice's own export.
+
+### Subcircuit support (Feature B)
+
+trustguard's parser handles:
+
+- `.subckt` / `.ends` block collection and extraction
+- `X`-instance flattening with automatic node namespacing (internal nodes become
+  `instancename:node` to avoid collisions)
+- `+` continuation lines rejoined before parsing
+- `.include` file resolution (local files only; URL `.include` lines are warned
+  and skipped)
+
+Errors detected during subcircuit processing:
+
+- `undefined_subckt` — X-instance references a subckt name not defined in the netlist
+- `port_mismatch` — X-instance provides a different number of nodes than the subckt port list
+- `subckt_recursion` — self- or mutual-referencing subckts (skipped with a warning)
+
+---
+
+## KiCad workflow (Feature C)
+
+```bash
+trustguard kicad myboard.cir
+```
+
+The `kicad` subcommand runs the standard trust check **plus** a KiCad-specific
+preflight that detects the classic export gotcha:
+
+**`kicad_ground_not_zero`** — ngspice requires the circuit ground to be exactly
+node `0`. KiCad schematics commonly use a `GND` net (or `GNDA`, `VSS`, `0V`,
+`AGND`, `DGND`, `PGND`) that is NOT automatically mapped to node 0 on SPICE
+export. When such a net is present and node 0 is absent, the simulation silently
+floats the entire circuit, yielding wrong voltages with no error. The message
+includes KiCad-specific fix instructions (set node mapping in Symbol Properties
+or place a `PWR_FLAG`).
+
+**Pipe form** — export and check in a single step without writing a file:
+
+```bash
+kicad-cli sch export netlist --format spice myboard.kicad_sch -o - \
+  | trustguard kicad -
+```
+
+**Important:** trustguard is a command-line workflow helper, not a native KiCad
+plugin. KiCad has no post-simulation event API, so there is no in-GUI integration;
+run `trustguard kicad` from your terminal or CI pipeline.
+
+---
+
+## Verdict model
+
+Every run produces one of three verdicts:
+
+| Verdict | Meaning |
+|---------|---------|
+| **TRUSTWORTHY** | ngspice exited 0 and no trust-breaking issues found |
+| **SUSPECT** | ngspice exited 0 but at least one FATAL/SILENT/WARN issue detected |
+| **FAILED** | ngspice exited non-zero |
+
+FAILED outranks SUSPECT, which outranks TRUSTWORTHY (this is why exit code 1 < 2
+numerically but FAILED is the worst outcome).
+
+### Detectors
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| `no_ground` | FATAL | No node '0' — circuit has no voltage reference |
+| `source_conflict` | FATAL | Multiple voltage sources forced across the same node pair |
+| `no_dc_path` | FATAL | Node reachable only through capacitors/current sources — no DC reference |
+| `timestep_collapse` | FATAL | Transient timestep collapsed; specific culprit identified from the log |
+| `singular_node` | FATAL | Singular matrix at a node — no defined DC solution |
+| `singular_branch` | FATAL | Singular matrix at a branch (current unconstrained) |
+| `silent_fallback` | SILENT | ngspice exited 0 after gmin/source stepping **failed**; operating point is a relaxed estimate, not a true solution |
+| `kicad_ground_not_zero` | WARN | KiCad export uses GND/GNDA/etc. but no node 0 (kicad subcommand only) |
+| `dangling_node` | WARN | Node connects to only one pin — likely a wiring mistake |
+
+---
+
+## Security
+
+trustguard runs ngspice in batch mode on the netlists you give it. A SPICE
+netlist can contain `.control`/`shell` directives that execute arbitrary shell
+commands — so **only run trustguard on netlists you trust** (treat them with
+the same caution as running an arbitrary script). The printed log may include
+output emitted by such directives. trustguard does not sanitize or restrict
+ngspice's execution environment.
+
+---
+
+## Limitations (honest scope)
+
+- **Parser scope:** The static netlist parser covers the element types listed in
+  `netlist.py` (`NODE_COUNT`). Exotic or simulator-specific elements not in that
+  table are silently skipped (they do not affect the running netlist — ngspice
+  still sees the full file).
+- **`.asc` is experimental** and scoped to 6 built-in 2-pin symbol types. Any
+  schematic with transistors, op-amps, subcircuit blocks, or custom symbols must
+  be exported from LTspice first. Always verify the generated netlist against
+  LTspice's own "View > SPICE Netlist".
+- **Legacy fallback** (`/opt/homebrew/bin/ngspice`) is tier-4 last-resort only.
+  It is not the preferred path; prefer `PATH` or the `$NGSPICE` variable.
+- **KiCad integration** is a CLI helper, not an in-application plugin.
+
+---
+
+## Development
+
+Run the test suite (no ngspice required for unit tests; integration tests
+auto-skip when ngspice is absent):
+
+```bash
+PYTHONPATH=src python3 -m pytest -q
+```
+
+Observed output on the current suite:
+
+```
+82 passed in 3.93s
+```
+
+---
+
+## How we got here
+
+1. Audited the original image-to-sim idea (market / engineering / business).
+2. Deep research across the full EDA/sim workflow + a competition cross-check.
+3. Ruled out taken/funded gaps (AR debugging = Cadence inspectAR; AI autorouting
+   = Quilter et al.; SI/PI = heavy field-solver work).
+4. Landed on the SPICE result-trustworthiness wedge and built the tool.

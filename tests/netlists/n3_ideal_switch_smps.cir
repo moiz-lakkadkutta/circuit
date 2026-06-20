@@ -1,0 +1,17 @@
+* N3: ideal switching converter, instant edges + ideal inductor
+* Expected failure mode: "Timestep too small" in transient
+.model SW SW(Ron=1m Roff=1meg Vt=0.5 Vh=0)
+.model D D(Is=1e-14)
+v1 in 0 12
+* ideal gate drive with zero rise/fall time
+vg gate 0 PULSE(0 1 0 0 0 5u 10u)
+s1 in sw gate 0 SW
+l1 sw out 100u
+d1 0 out D
+c1 out 0 100u
+rload out 0 10
+.tran 1n 500u
+.control
+run
+.endc
+.end
