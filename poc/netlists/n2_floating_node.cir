@@ -1,0 +1,7 @@
+* N2: floating node with no DC path (node 2 only touches capacitors)
+* Expected failure mode: singular matrix at DC operating point
+v1 1 0 5
+c1 1 2 1u
+c2 2 0 1u
+.op
+.end

@@ -1,0 +1,7 @@
+* N6: two ideal voltage sources of different value across the same nodes
+* Expected failure mode: singular / zero-impedance loop conflict
+v1 1 0 5
+v2 1 0 3
+r1 1 0 1k
+.op
+.end

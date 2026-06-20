@@ -1,0 +1,8 @@
+* N1: missing ground reference (no node 0 anywhere)
+* Expected failure mode: singular matrix / no DC path to ground
+v1 a b 5
+r1 a b 1k
+r2 b c 2k
+r3 c a 3k
+.op
+.end

@@ -1,0 +1,20 @@
+* Real-world: common-emitter BJT amplifier (standard textbook topology)
+* Healthy. Has input/output coupling caps + emitter bypass cap. The cap-fed
+* nodes are still DC-referenced via the bias resistors, so no_dc_path must NOT fire.
+vcc vcc 0 12
+vin in 0 SIN(0 10m 1k)
+cin in b 1u
+r1 vcc b 47k
+r2 b 0 10k
+rc vcc c 2.2k
+re e 0 1k
+ce e 0 100u
+q1 c b e QNPN
+cout c out 1u
+rload out 0 100k
+.model QNPN NPN(Is=1e-14 Bf=200 Vaf=100)
+.tran 20u 5m
+.control
+run
+.endc
+.end

@@ -1,0 +1,11 @@
+* N5: CONTROL — a healthy RC divider that should converge cleanly
+* Used to confirm the diagnoser does NOT cry wolf on good circuits
+v1 1 0 5
+r1 1 2 1k
+r2 2 0 1k
+c1 2 0 1u
+.tran 1u 5m
+.control
+run
+.endc
+.end

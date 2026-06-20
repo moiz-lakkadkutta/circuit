@@ -1,0 +1,11 @@
+.title KiCad schematic -> ngspice (Eeschema SPICE export style)
+* Net names use KiCad's hierarchical '/NET' convention; ground is net 0.
+* Bug planted: /SENSE touches only capacitors -> no DC path. trustguard should
+* flag it even though it came from KiCad, not a hand-written netlist.
+V1 /VIN 0 DC 5
+R1 /VIN /OUT 10k
+C1 /OUT /SENSE 1u
+C2 /SENSE 0 1u
+RL /OUT 0 100k
+.op
+.end

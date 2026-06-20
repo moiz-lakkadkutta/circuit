@@ -1,0 +1,9 @@
+* N8: two 5V sources stacked in series — node 2 legitimately sits at 10V
+* Properly grounded, converges cleanly. A correct circuit whose node voltage
+* exceeds the largest single source. The naive rail_violation detector wrongly
+* flagged this; the fix must call it TRUSTWORTHY.
+v1 1 0 5
+v2 2 1 5
+r1 2 0 10k
+.op
+.end
