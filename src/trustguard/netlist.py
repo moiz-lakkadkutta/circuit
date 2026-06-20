@@ -180,7 +180,25 @@ def parse_and_flatten(text, base_dir):
 
     defs, top_lines = _collect_defs(all_lines)
 
-    # --- Step 3: node mapping helper --------------------------------------------
+    # --- Step 3: helper to strip trailing param tokens from X-instance lines ----
+
+    def _strip_x_params(toks):
+        """Strip trailing key=value params (and optional PARAMS: keyword) from
+        an already-split X-instance token list.
+
+        SPICE syntax: X<name> node1 ... nodeK SUBCKTNAME [PARAMS:] [key=val ...]
+        After stripping, toks[-1] is the subckt name and toks[1:-1] are ext nodes.
+        """
+        t = list(toks)
+        # Remove trailing tokens that contain '=' (key=value params).
+        while len(t) > 2 and "=" in t[-1]:
+            t.pop()
+        # Remove a trailing bare 'PARAMS:' or 'PARAMS' keyword if present.
+        if len(t) > 2 and t[-1].upper().rstrip(":") == "PARAMS":
+            t.pop()
+        return t
+
+    # --- Step 4: node mapping helper --------------------------------------------
 
     def _map_node(node, port_map, instance_name):
         """Map a single node name for a flattened instance.
@@ -217,6 +235,7 @@ def parse_and_flatten(text, base_dir):
                 # Nested X-instance inside subckt body.
                 if len(toks) < 3:
                     continue
+                toks = _strip_x_params(toks)
                 xname = toks[0]
                 sub_ref = toks[-1].upper()
                 ext_raw = toks[1:-1]
@@ -285,6 +304,7 @@ def parse_and_flatten(text, base_dir):
                 parse_issues.append(_make_issue("WARN", "undefined_subckt",
                     f"Instance '{toks[0]}' has too few tokens to parse."))
                 continue
+            toks = _strip_x_params(toks)
             xname = toks[0]
             sub_ref = toks[-1].upper()
             ext_nodes = toks[1:-1]

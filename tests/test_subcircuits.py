@@ -306,3 +306,101 @@ def test_two_instances_same_subckt_no_refdes_collision():
     assert "no_dc_path" not in trust_breaking_codes, (
         f"no_dc_path should not fire: {trust_breaking_codes}"
     )
+
+
+# ---------------------------------------------------------------------------
+# SF-3 (FIX 1): X-instance with trailing param=val tokens must not be misparsed
+# ---------------------------------------------------------------------------
+
+def test_trailing_params_no_undefined_subckt():
+    """X-instance with trailing key=val params must match its subckt, not falsely emit
+    undefined_subckt or port_mismatch."""
+    text = """\
+* trailing params test
+.subckt DIV in out
+R1 in out 1k
+.ends DIV
+V1 in 0 5
+X1 in out DIV foo=1 bar=2
+.op
+.end
+"""
+    elements, node_elems, parse_issues = parse_and_flatten(text, Path("."))
+    codes = issue_codes(parse_issues)
+    assert "undefined_subckt" not in codes, (
+        f"Trailing params caused spurious undefined_subckt: {parse_issues}"
+    )
+    assert "port_mismatch" not in codes, (
+        f"Trailing params caused spurious port_mismatch: {parse_issues}"
+    )
+    # The flattened resistor from DIV must be present and connect the right nodes
+    assert len(elements) >= 1, "Expected flattened elements from DIV subckt"
+    refdes_list = [e.refdes for e in elements]
+    assert any("R1" in r for r in refdes_list), (
+        f"Expected flattened R1 from DIV, got: {refdes_list}"
+    )
+
+
+def test_trailing_params_keyword_tolerated():
+    """X-instance with PARAMS: keyword before key=val tokens must parse correctly."""
+    text = """\
+* params keyword test
+.subckt DIV2 in out
+R1 in out 2k
+.ends DIV2
+V1 in 0 5
+X1 in out DIV2 PARAMS: foo=1 bar=2
+.op
+.end
+"""
+    elements, node_elems, parse_issues = parse_and_flatten(text, Path("."))
+    codes = issue_codes(parse_issues)
+    assert "undefined_subckt" not in codes, (
+        f"PARAMS: keyword caused spurious undefined_subckt: {parse_issues}"
+    )
+    assert "port_mismatch" not in codes, (
+        f"PARAMS: keyword caused spurious port_mismatch: {parse_issues}"
+    )
+    assert len(elements) >= 1, "Expected flattened elements from DIV2 subckt"
+
+
+# ---------------------------------------------------------------------------
+# AC-B3 (FIX 2): Asymmetric subckt — port mapping must preserve positional order
+# ---------------------------------------------------------------------------
+
+def test_asymmetric_port_mapping():
+    """Asymmetric subckt must bind ports in correct positional order.
+
+    ASYM has ports (a, b): R1 connects a to 0, C1 connects b to a.
+    X1 N1 N2 ASYM => a=N1, b=N2.
+    After flatten: R1 nodes must be [N1, 0]; C1 nodes must be [N2, N1].
+    A port-swap bug would give R1=[N2,0] and C1=[N1,N2], which is different.
+    """
+    text = """\
+* asymmetric port mapping test
+.subckt ASYM a b
+R1 a 0 1k
+C1 b a 1n
+.ends ASYM
+X1 N1 N2 ASYM
+.op
+.end
+"""
+    elements, node_elems, parse_issues = parse_and_flatten(text, Path("."))
+    assert parse_issues == [], f"Unexpected parse issues: {parse_issues}"
+
+    r1 = next((e for e in elements if e.refdes.endswith(":R1")), None)
+    c1 = next((e for e in elements if e.refdes.endswith(":C1")), None)
+    assert r1 is not None, f"Flattened R1 not found in: {[e.refdes for e in elements]}"
+    assert c1 is not None, f"Flattened C1 not found in: {[e.refdes for e in elements]}"
+
+    # a -> N1, 0 stays 0 => R1 nodes = [N1, 0]
+    assert r1.nodes == ["N1", "0"], (
+        f"R1 should connect [N1, 0] (a=N1), got {r1.nodes}. "
+        "If [N2, 0] appears, ports were swapped."
+    )
+    # b -> N2, a -> N1 => C1 nodes = [N2, N1]
+    assert c1.nodes == ["N2", "N1"], (
+        f"C1 should connect [N2, N1] (b=N2, a=N1), got {c1.nodes}. "
+        "If [N1, N2] appears, ports were swapped."
+    )
