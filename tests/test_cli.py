@@ -229,6 +229,53 @@ def test_report_called_for_each_file(monkeypatch, capsys):
 
 
 # ---------------------------------------------------------------------------
+# --help exits 0 (regression guard for custom _ArgumentParser)
+# ---------------------------------------------------------------------------
+
+def test_help_exits_0(capsys):
+    """trustguard --help must exit 0 and print usage."""
+    from trustguard.cli import main
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "trustguard" in combined.lower() or "usage" in combined.lower()
+
+
+# ---------------------------------------------------------------------------
+# kicad subcommand: must invoke kicad_preflight (not plain evaluate only)
+# ---------------------------------------------------------------------------
+
+def test_kicad_subcommand_calls_kicad_preflight(monkeypatch, capsys):
+    """trustguard kicad FILE must call kicad_preflight and surface its findings."""
+    # Patch evaluate in cli module so no ngspice is needed.
+    patch_evaluate(monkeypatch, fixed_result=make_result("TRUSTWORTHY"))
+
+    # Patch kicad_preflight to return a WARN issue; verify it surfaces.
+    from trustguard.checks import Issue
+    preflight_issue = Issue("WARN", "kicad_ground_not_zero",
+                            "GND found but no node 0 — test sentinel")
+    monkeypatch.setattr(
+        "trustguard.kicad.kicad_preflight",
+        lambda text: [preflight_issue],
+    )
+
+    from trustguard.cli import main
+    # Provide a real file so open() in the kicad branch can read it.
+    netlist = str(Path(__file__).parent / "netlists" / "n5_healthy_control.cir")
+    code = main(["kicad", netlist])
+
+    # WARN from preflight → SUSPECT → exit 2
+    assert code == 2, f"Expected exit 2 (SUSPECT from preflight WARN), got {code}"
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "kicad_ground_not_zero" in combined, (
+        f"Preflight issue not surfaced in output: {combined}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Optional: real end-to-end with ngspice (skipped if absent)
 # ---------------------------------------------------------------------------
 

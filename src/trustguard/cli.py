@@ -3,9 +3,11 @@ Command-line interface for trustguard.
 """
 import argparse
 import sys
+import tempfile
+from pathlib import Path
 
 import trustguard
-from trustguard.core import evaluate, exit_code, report
+from trustguard.core import evaluate, exit_code, report, TRUST_BREAKING
 from trustguard.ngspice import NgspiceNotFound
 
 # Known subcommands — detected manually before argparse so that positional
@@ -14,6 +16,12 @@ from trustguard.ngspice import NgspiceNotFound
 # when it encounters an unrecognised first positional token.  T5 adds its
 # kicad branch by checking `command == "kicad"` in main().
 _SUBCOMMANDS = frozenset({"kicad"})
+
+# EDGE CASE NOTE: a file literally named "kicad" passed as the first positional
+# argument is treated as the subcommand, not as a FILE path.  This is
+# intentional and acceptable — the manual subcommand peeling happens before
+# argparse so Python 3.9+ _SubParsersAction confusion is avoided.  Users with
+# a file named "kicad" can work around it with "./kicad" or an absolute path.
 
 
 class _ArgumentParser(argparse.ArgumentParser):
@@ -106,10 +114,63 @@ def main(argv=None):
 
     # ------------------------------------------------------------------ #
     # Step 3 — dispatch                                                    #
-    # T5 adds: `if command == "kicad": <kicad-specific logic>; return`    #
     # ------------------------------------------------------------------ #
 
-    # Default review mode (also used by kicad for now).
+    if command == "kicad":
+        # KiCad post-simulation hook: run kicad_preflight (ngspice-free
+        # gotcha detection) on top of the standard evaluate() pass.
+        # FILE '-' reads the netlist from STDIN, enabling the pipe workflow:
+        #   kicad-cli sch export netlist --format spice ... | trustguard kicad -
+        from trustguard import kicad as _kicad_mod
+        codes = []
+        try:
+            for p in paths:
+                if p == "-":
+                    text = sys.stdin.read()
+                    # Write stdin text to a temp file so evaluate() can use it.
+                    with tempfile.NamedTemporaryFile(
+                        "w", suffix=".cir", delete=False
+                    ) as f:
+                        f.write(text)
+                        tmp = f.name
+                    try:
+                        r = evaluate(tmp, ngspice_path=ngspice_path)
+                    finally:
+                        Path(tmp).unlink(missing_ok=True)
+                else:
+                    # Call evaluate first (supports monkeypatching in tests);
+                    # text is retrieved from r.netlist_text to avoid a second
+                    # file read and to work correctly with format-converted inputs.
+                    r = evaluate(p, ngspice_path=ngspice_path)
+                    text = r.netlist_text
+
+                # Run KiCad-specific preflight and merge any new findings.
+                preflight = _kicad_mod.kicad_preflight(text)
+                if preflight:
+                    existing = {i.code for i in r.issues}
+                    for pi in reversed(preflight):
+                        if pi.code not in existing:
+                            r.issues.insert(0, pi)
+                            existing.add(pi.code)
+                    # Recalculate verdict with augmented issues.
+                    trust_breaking = any(
+                        i.severity in TRUST_BREAKING for i in r.issues
+                    )
+                    if r.rc != 0:
+                        r.verdict = "FAILED"
+                    elif trust_breaking:
+                        r.verdict = "SUSPECT"
+                    else:
+                        r.verdict = "TRUSTWORTHY"
+
+                report(r)
+                codes.append(exit_code(r.verdict))
+        except NgspiceNotFound as exc:
+            print(str(exc), file=sys.stderr)
+            sys.exit(3)
+        return _worst_exit_code(codes)
+
+    # Default review mode.
     codes = []
     try:
         for p in paths:
