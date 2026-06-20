@@ -3,11 +3,10 @@ Command-line interface for trustguard.
 """
 import argparse
 import sys
-import tempfile
 from pathlib import Path
 
 import trustguard
-from trustguard.core import evaluate, exit_code, report, TRUST_BREAKING
+from trustguard.core import evaluate, exit_code, report
 from trustguard.ngspice import NgspiceNotFound
 
 # Known subcommands — detected manually before argparse so that positional
@@ -45,6 +44,15 @@ def _build_parser():
     parser = _ArgumentParser(
         prog="trustguard",
         description="Evaluate SPICE netlists for simulation trustworthiness.",
+        epilog=(
+            "subcommands:\n"
+            "  trustguard kicad FILE...   KiCad post-simulation check — runs standard\n"
+            "                             trust evaluation plus KiCad-specific preflight\n"
+            "                             (e.g. ground-net mapping gotcha detection).\n"
+            "                             Pass '-' as FILE to read from stdin:\n"
+            "                               kicad-cli sch export ... | trustguard kicad -"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version",
@@ -117,8 +125,9 @@ def main(argv=None):
     # ------------------------------------------------------------------ #
 
     if command == "kicad":
-        # KiCad post-simulation hook: run kicad_preflight (ngspice-free
-        # gotcha detection) on top of the standard evaluate() pass.
+        # KiCad post-simulation hook: delegate entirely to
+        # kicad.check_kicad_netlist which is the single importable entry
+        # point for preflight + evaluate + verdict calculation.
         # FILE '-' reads the netlist from STDIN, enabling the pipe workflow:
         #   kicad-cli sch export netlist --format spice ... | trustguard kicad -
         from trustguard import kicad as _kicad_mod
@@ -126,43 +135,11 @@ def main(argv=None):
         try:
             for p in paths:
                 if p == "-":
+                    # Pass raw text; check_kicad_netlist handles temp-file creation.
                     text = sys.stdin.read()
-                    # Write stdin text to a temp file so evaluate() can use it.
-                    with tempfile.NamedTemporaryFile(
-                        "w", suffix=".cir", delete=False
-                    ) as f:
-                        f.write(text)
-                        tmp = f.name
-                    try:
-                        r = evaluate(tmp, ngspice_path=ngspice_path)
-                    finally:
-                        Path(tmp).unlink(missing_ok=True)
+                    r = _kicad_mod.check_kicad_netlist(text, ngspice_path=ngspice_path)
                 else:
-                    # Call evaluate first (supports monkeypatching in tests);
-                    # text is retrieved from r.netlist_text to avoid a second
-                    # file read and to work correctly with format-converted inputs.
-                    r = evaluate(p, ngspice_path=ngspice_path)
-                    text = r.netlist_text
-
-                # Run KiCad-specific preflight and merge any new findings.
-                preflight = _kicad_mod.kicad_preflight(text)
-                if preflight:
-                    existing = {i.code for i in r.issues}
-                    for pi in reversed(preflight):
-                        if pi.code not in existing:
-                            r.issues.insert(0, pi)
-                            existing.add(pi.code)
-                    # Recalculate verdict with augmented issues.
-                    trust_breaking = any(
-                        i.severity in TRUST_BREAKING for i in r.issues
-                    )
-                    if r.rc != 0:
-                        r.verdict = "FAILED"
-                    elif trust_breaking:
-                        r.verdict = "SUSPECT"
-                    else:
-                        r.verdict = "TRUSTWORTHY"
-
+                    r = _kicad_mod.check_kicad_netlist(p, ngspice_path=ngspice_path)
                 report(r)
                 codes.append(exit_code(r.verdict))
         except NgspiceNotFound as exc:

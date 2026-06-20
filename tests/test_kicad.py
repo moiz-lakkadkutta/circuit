@@ -298,15 +298,21 @@ def test_check_kicad_netlist_uses_converted_text(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_kicad_cli_stdin_gnd_preflight(monkeypatch, capsys):
-    """trustguard kicad - reads stdin; GND fixture triggers kicad_ground_not_zero SUSPECT."""
+    """trustguard kicad - reads stdin; GND fixture triggers kicad_ground_not_zero SUSPECT.
+
+    The kicad CLI branch now delegates to kicad.check_kicad_netlist, which
+    lazily imports evaluate from trustguard.core.  Patch trustguard.core.evaluate
+    (not trustguard.cli.evaluate) to avoid running real ngspice.
+    """
     text = (RW / "kicad_gnd.cir").read_text()
     monkeypatch.setattr("sys.stdin", StringIO(text))
 
-    # Mock evaluate so we don't need ngspice; return a clean TRUSTWORTHY base result
-    # kicad_preflight will still run on the text and upgrade to SUSPECT.
+    # Mock evaluate via the core module so check_kicad_netlist's lazy import
+    # picks it up; return a clean TRUSTWORTHY base so kicad_preflight determines
+    # the final verdict.
     from trustguard.core import Result
     monkeypatch.setattr(
-        "trustguard.cli.evaluate",
+        "trustguard.core.evaluate",
         lambda path, ngspice_path=None: Result(path=path, verdict="TRUSTWORTHY", rc=0),
     )
 

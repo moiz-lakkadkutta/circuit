@@ -295,3 +295,82 @@ def test_real_healthy_netlist_exits_0():
     from trustguard.cli import main
     code = main([str(NETLISTS / "n5_healthy_control.cir")])
     assert code == 0
+
+
+# ---------------------------------------------------------------------------
+# FIX 1: verdict_from helper in core (RED: ImportError until implemented)
+# ---------------------------------------------------------------------------
+
+def test_verdict_from_helper_in_core():
+    """core.verdict_from must exist and return correct verdicts."""
+    from trustguard.core import verdict_from
+    from trustguard.checks import Issue
+
+    # rc != 0 → FAILED regardless of issues
+    assert verdict_from(1, []) == "FAILED"
+    assert verdict_from(2, [Issue("INFO", "x", "x")]) == "FAILED"
+
+    # rc == 0, no issues → TRUSTWORTHY
+    assert verdict_from(0, []) == "TRUSTWORTHY"
+
+    # rc == 0, only INFO → TRUSTWORTHY (INFO does not break trust)
+    info_issue = Issue("INFO", "info_code", "info message")
+    assert verdict_from(0, [info_issue]) == "TRUSTWORTHY"
+
+    # rc == 0, WARN issue → SUSPECT
+    warn_issue = Issue("WARN", "warn_code", "warn message")
+    assert verdict_from(0, [warn_issue]) == "SUSPECT"
+
+    # rc == 0, FATAL issue → SUSPECT
+    fatal_issue = Issue("FATAL", "fatal_code", "fatal message")
+    assert verdict_from(0, [fatal_issue]) == "SUSPECT"
+
+    # rc == 0, SILENT issue → SUSPECT
+    silent_issue = Issue("SILENT", "silent_code", "silent message")
+    assert verdict_from(0, [silent_issue]) == "SUSPECT"
+
+
+# ---------------------------------------------------------------------------
+# FIX 1: kicad CLI branch must delegate to check_kicad_netlist
+# ---------------------------------------------------------------------------
+
+def test_kicad_cli_delegates_to_check_kicad_netlist(monkeypatch, capsys):
+    """kicad CLI branch must call kicad.check_kicad_netlist, not re-implement merge."""
+    from trustguard.core import Result
+    mock_calls = []
+
+    def fake_check(path_or_text, ngspice_path=None):
+        mock_calls.append(str(path_or_text))
+        return Result(path=str(path_or_text), verdict="TRUSTWORTHY", rc=0)
+
+    monkeypatch.setattr("trustguard.kicad.check_kicad_netlist", fake_check)
+    # Also patch cli.evaluate so that if delegation is absent, the call still
+    # won't hang on ngspice — the test assertion (mock_calls empty) will still fail.
+    patch_evaluate(monkeypatch, fixed_result=make_result("TRUSTWORTHY"))
+
+    from trustguard.cli import main
+    netlist = str(Path(__file__).parent / "netlists" / "n5_healthy_control.cir")
+    code = main(["kicad", netlist])
+
+    assert mock_calls, (
+        "kicad CLI branch must delegate to kicad.check_kicad_netlist — "
+        "direct re-implementation found instead"
+    )
+    assert code == 0
+
+
+# ---------------------------------------------------------------------------
+# FIX 2: --help must mention the kicad subcommand
+# ---------------------------------------------------------------------------
+
+def test_help_contains_kicad(capsys):
+    """trustguard --help must document the kicad subcommand."""
+    from trustguard.cli import main
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "kicad" in combined.lower(), (
+        f"Expected 'kicad' in --help output. Got:\n{combined}"
+    )

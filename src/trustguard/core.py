@@ -25,6 +25,21 @@ class Result:
     netlist_text: str = ""
 
 
+def verdict_from(rc, issues):
+    """Compute a verdict string from a simulation return code and issue list.
+
+    FAILED if rc != 0; SUSPECT if any issue.severity in TRUST_BREAKING; else
+    TRUSTWORTHY.  This is the single authoritative verdict calculation used by
+    evaluate(), kicad.check_kicad_netlist(), and any other site that needs to
+    (re-)compute a verdict after augmenting an issue list.
+    """
+    if rc != 0:
+        return "FAILED"
+    if any(i.severity in TRUST_BREAKING for i in issues):
+        return "SUSPECT"
+    return "TRUSTWORTHY"
+
+
 def evaluate(path, ngspice_path=None):
     """Evaluate a netlist (or convertible schematic) and return a Result."""
     netlist_text, source, conv_warnings = formats.load_as_netlist(path)
@@ -49,11 +64,7 @@ def evaluate(path, ngspice_path=None):
             seen.add(i.code)
             deduped.append(i)
 
-    trust_breaking = any(i.severity in TRUST_BREAKING for i in deduped)
-    verdict = ("FAILED" if rc != 0
-               else "SUSPECT" if trust_breaking
-               else "TRUSTWORTHY")
-    return Result(str(path), verdict, rc, deduped, sig, source, netlist_text)
+    return Result(str(path), verdict_from(rc, deduped), rc, deduped, sig, source, netlist_text)
 
 
 def exit_code(verdict):
