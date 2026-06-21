@@ -139,12 +139,20 @@ def main(argv=None):
                     text = sys.stdin.read()
                     r = _kicad_mod.check_kicad_netlist(text, ngspice_path=ngspice_path)
                 else:
+                    # check_kicad_netlist accepts path-or-text, so a missing path
+                    # would be silently treated as netlist text. The CLI always
+                    # passes a file path here, so validate it first for a clean error.
+                    if not Path(p).is_file():
+                        raise FileNotFoundError(2, "No such file or directory", p)
                     r = _kicad_mod.check_kicad_netlist(p, ngspice_path=ngspice_path)
                 report(r)
                 codes.append(exit_code(r.verdict))
         except NgspiceNotFound as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(3)
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"trustguard: error: cannot read input: {exc}", file=sys.stderr)
+            sys.exit(64)
         return _worst_exit_code(codes)
 
     # Default review mode.
@@ -157,6 +165,9 @@ def main(argv=None):
     except NgspiceNotFound as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(3)
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"trustguard: error: cannot read input: {exc}", file=sys.stderr)
+        sys.exit(64)
 
     return _worst_exit_code(codes)
 

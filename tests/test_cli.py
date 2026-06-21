@@ -194,15 +194,14 @@ def test_ngspice_not_found_exits_3(monkeypatch, capsys):
 # Subcommand structure: kicad subcommand exists, no-subcommand form works
 # ---------------------------------------------------------------------------
 
-def test_kicad_subcommand_accepted(monkeypatch, capsys):
-    """kicad subcommand must be accepted without argparse error."""
+def test_kicad_subcommand_accepted(monkeypatch, tmp_path, capsys):
+    """kicad subcommand on a real file must be accepted and return the verdict code."""
     patch_evaluate(monkeypatch, fixed_result=make_result("TRUSTWORTHY"))
+    f = tmp_path / "board.cir"
+    f.write_text("v1 1 0 5\nr1 1 0 1k\n.op\n.end\n")
     from trustguard.cli import main
-    # Should not raise SystemExit(64); any valid exit is fine
-    try:
-        code = main(["kicad", "dummy.cir"])
-    except SystemExit as e:
-        assert e.code != 64, f"kicad subcommand should not exit 64, got {e.code}"
+    code = main(["kicad", str(f)])
+    assert code == 0  # TRUSTWORTHY (evaluate patched; preflight finds no GND-gotcha)
 
 
 def test_no_subcommand_form_works(monkeypatch, capsys):
@@ -374,3 +373,35 @@ def test_help_contains_kicad(capsys):
     assert "kicad" in combined.lower(), (
         f"Expected 'kicad' in --help output. Got:\n{combined}"
     )
+
+
+# --- file I/O error handling (regression: must not traceback) ---
+
+def test_nonexistent_file_exits_64_no_traceback(capsys):
+    from trustguard.cli import main
+    with pytest.raises(SystemExit) as exc:
+        main(["/tmp/trustguard_definitely_missing_xyz.cir"])
+    assert exc.value.code == 64
+    err = capsys.readouterr().err
+    assert "cannot read" in err
+    assert "Traceback" not in err
+
+
+def test_directory_input_exits_64_no_traceback(tmp_path, capsys):
+    from trustguard.cli import main
+    with pytest.raises(SystemExit) as exc:
+        main([str(tmp_path)])  # a directory, not a file
+    assert exc.value.code == 64
+    err = capsys.readouterr().err
+    assert "cannot read" in err
+    assert "Traceback" not in err
+
+
+def test_kicad_nonexistent_file_exits_64_no_traceback(capsys):
+    from trustguard.cli import main
+    with pytest.raises(SystemExit) as exc:
+        main(["kicad", "/tmp/trustguard_missing_kicad_xyz.cir"])
+    assert exc.value.code == 64
+    err = capsys.readouterr().err
+    assert "cannot read" in err
+    assert "Traceback" not in err
