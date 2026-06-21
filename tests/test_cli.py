@@ -51,7 +51,13 @@ def patch_evaluate(monkeypatch, results_by_path=None, fixed_result=None, raise_e
             return results_by_path[str(path)]
         raise RuntimeError("patch_evaluate: no result configured")
 
+    # Patch both bindings: the default CLI path uses spiceguard.cli.evaluate
+    # (module-level import), while the `kicad` path reaches evaluate through
+    # kicad.check_kicad_netlist, which does a lazy `from spiceguard.core import
+    # evaluate`. Patching only cli.evaluate would let the kicad tests fall through
+    # to real ngspice (green only by luck on machines that have it installed).
     monkeypatch.setattr("spiceguard.cli.evaluate", fake_evaluate)
+    monkeypatch.setattr("spiceguard.core.evaluate", fake_evaluate)
     return calls
 
 
