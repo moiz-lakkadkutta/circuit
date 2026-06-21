@@ -1,0 +1,57 @@
+{
+  "name": "spiceguard",
+  "displayName": "spiceguard — SPICE result trust checks",
+  "description": "Flags untrustworthy ngspice results (silent/wrong sims) inline as you edit SPICE netlists.",
+  "version": "0.1.0",
+  "publisher": "moiz-lakkadkutta",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/moiz-lakkadkutta/circuit" },
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Linters", "Other"],
+  "keywords": ["spice", "ngspice", "netlist", "circuit", "eda", "kicad", "ltspice"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "spiceguard.checkFile",
+        "title": "spiceguard: Check current netlist"
+      }
+    ],
+    "configuration": {
+      "title": "spiceguard",
+      "properties": {
+        "spiceguard.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable spiceguard trust checks."
+        },
+        "spiceguard.path": {
+          "type": "string",
+          "default": "spiceguard",
+          "description": "Path to the spiceguard executable (must be on PATH or absolute)."
+        },
+        "spiceguard.ngspicePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional explicit path to the ngspice binary (passed as --ngspice). Leave empty for auto-discovery."
+        },
+        "spiceguard.checkOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run a check when a netlist file is opened (in addition to on save)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.4.0"
+  }
+}

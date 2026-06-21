@@ -66,12 +66,41 @@ def _build_parser():
         help="Path to the ngspice binary (overrides auto-discovery).",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit results as a JSON array instead of human-readable text "
+             "(for editors, CI, and other tooling). Exit codes are unchanged.",
+    )
+    parser.add_argument(
         "paths",
         nargs="*",
         metavar="FILE",
         help="Netlist or schematic files to check.",
     )
     return parser
+
+
+def _emit(results, as_json):
+    """Render results either as human-readable reports or a JSON array."""
+    if as_json:
+        import json
+        payload = [
+            {
+                "path": r.path,
+                "verdict": r.verdict,
+                "returncode": r.rc,
+                "source": r.source,
+                "issues": [
+                    {"severity": i.severity, "code": i.code, "message": i.message}
+                    for i in r.issues
+                ],
+            }
+            for r in results
+        ]
+        print(json.dumps(payload, indent=2))
+    else:
+        for r in results:
+            report(r)
 
 
 def _worst_exit_code(codes):
@@ -131,7 +160,7 @@ def main(argv=None):
         # FILE '-' reads the netlist from STDIN, enabling the pipe workflow:
         #   kicad-cli sch export netlist --format spice ... | spiceguard kicad -
         from spiceguard import kicad as _kicad_mod
-        codes = []
+        codes, results = [], []
         try:
             for p in paths:
                 if p == "-":
@@ -145,7 +174,7 @@ def main(argv=None):
                     if not Path(p).is_file():
                         raise FileNotFoundError(2, "No such file or directory", p)
                     r = _kicad_mod.check_kicad_netlist(p, ngspice_path=ngspice_path)
-                report(r)
+                results.append(r)
                 codes.append(exit_code(r.verdict))
         except NgspiceNotFound as exc:
             print(str(exc), file=sys.stderr)
@@ -153,14 +182,15 @@ def main(argv=None):
         except (OSError, UnicodeDecodeError) as exc:
             print(f"spiceguard: error: cannot read input: {exc}", file=sys.stderr)
             sys.exit(64)
+        _emit(results, args.json)
         return _worst_exit_code(codes)
 
     # Default review mode.
-    codes = []
+    codes, results = [], []
     try:
         for p in paths:
             r = evaluate(p, ngspice_path=ngspice_path)
-            report(r)
+            results.append(r)
             codes.append(exit_code(r.verdict))
     except NgspiceNotFound as exc:
         print(str(exc), file=sys.stderr)
@@ -169,6 +199,7 @@ def main(argv=None):
         print(f"spiceguard: error: cannot read input: {exc}", file=sys.stderr)
         sys.exit(64)
 
+    _emit(results, args.json)
     return _worst_exit_code(codes)
 
 

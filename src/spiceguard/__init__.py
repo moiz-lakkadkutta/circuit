@@ -1,7 +1,7 @@
 """
 spiceguard — answer one question about a SPICE run: can I trust this result?
 """
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from spiceguard import formats, ngspice
 from spiceguard.checks import Issue

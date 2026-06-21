@@ -35,18 +35,28 @@ schematics (experimental, built-in 2-pin symbols only).
 brew install ngspice          # macOS; Linux: apt install ngspice
 ```
 
-**Install from the repo:**
+**From PyPI:**
+
+```bash
+pip install spiceguard
+```
+
+**From the repo (development):**
 
 ```bash
 pip install .
-```
-
-This registers a `spiceguard` command on your PATH. Alternatively, run directly
-without installing (useful during development):
-
-```bash
+# or, without installing:
 PYTHONPATH=src python3 -m spiceguard FILE...
 ```
+
+**Docker (zero setup — ngspice bundled):**
+
+```bash
+docker build -t spiceguard -f docker/Dockerfile .
+docker run --rm -v "$PWD:/work" spiceguard mycircuit.cir
+```
+
+This registers a `spiceguard` command on your PATH.
 
 ---
 
@@ -87,6 +97,7 @@ spiceguard evaluates each in sequence and exits with the worst verdict across al
 |------|-------------|
 | `FILE...` | One or more netlist or schematic files to check |
 | `--ngspice PATH` | Explicit path to the ngspice binary |
+| `--json` | Emit results as a JSON array (for editors, CI, tooling) |
 | `--version` | Print version and exit |
 | `--help` | Show usage |
 
@@ -220,6 +231,17 @@ numerically but FAILED is the worst outcome).
 | `dangling_node` | WARN | Node connects to only one pin — likely a wiring mistake |
 
 ---
+
+## Integrations
+
+| Surface | Where | What it gives you |
+| --- | --- | --- |
+| **Docker** | [`docker/`](docker/) | Zero-setup image with ngspice bundled |
+| **VS Code** | [`vscode/`](vscode/) | Inline trust diagnostics as you edit `.cir`/`.net`/`.sp` files (consumes `--json`) |
+| **KiCad** | [`kicad/`](kicad/) | `kicad-cli` netlist export → `spiceguard kicad`, as a one-liner, helper script, or CI step |
+
+All three build on the same engine; the `--json` output makes spiceguard easy to
+wire into editors, CI, and other tools.
 
 ## Security
 
