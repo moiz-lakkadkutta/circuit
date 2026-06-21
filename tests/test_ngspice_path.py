@@ -8,7 +8,7 @@ import types
 
 import pytest
 
-from trustguard.ngspice import NgspiceNotFound, resolve_ngspice_path
+from spiceguard.ngspice import NgspiceNotFound, resolve_ngspice_path
 
 
 # ---------------------------------------------------------------------------
@@ -203,13 +203,13 @@ class TestRunNgspiceTextWiring:
         monkeypatch.setattr(shutil, "which", lambda _: None)
         monkeypatch.setattr(os, "access", _make_access({}))
 
-        from trustguard.ngspice import run_ngspice_text
+        from spiceguard.ngspice import run_ngspice_text
         with pytest.raises(NgspiceNotFound):
             run_ngspice_text("* test netlist\n.end\n")
 
     def test_explicit_ngspice_path_forwarded_to_subprocess_argv0(self, monkeypatch):
         """run_ngspice_text(ngspice_path=X) must use X as subprocess argv[0]."""
-        import trustguard.ngspice as _mod
+        import spiceguard.ngspice as _mod
 
         CUSTOM = "/custom/ng"
         captured = {}
@@ -238,7 +238,7 @@ class TestRunNgspiceTextWiring:
 
     def test_no_explicit_path_uses_resolver_choice_as_argv0(self, monkeypatch):
         """run_ngspice_text() with no path uses whatever resolve_ngspice_path returns."""
-        import trustguard.ngspice as _mod
+        import spiceguard.ngspice as _mod
 
         RESOLVED = "/resolved/ngspice"
         captured = {}
@@ -275,7 +275,7 @@ class TestNgspiceAvailable:
         monkeypatch.setattr(shutil, "which", lambda _: FAKE_WHICH)
         monkeypatch.setattr(os, "access", _make_access({}))
 
-        from trustguard.ngspice import ngspice_available
+        from spiceguard.ngspice import ngspice_available
         assert ngspice_available() is True
 
     def test_returns_false_when_nothing_found(self, monkeypatch):
@@ -283,12 +283,12 @@ class TestNgspiceAvailable:
         monkeypatch.setattr(shutil, "which", lambda _: None)
         monkeypatch.setattr(os, "access", _make_access({}))
 
-        from trustguard.ngspice import ngspice_available
+        from spiceguard.ngspice import ngspice_available
         assert ngspice_available() is False
 
     def test_returns_true_when_resolve_succeeds_via_direct_patch(self, monkeypatch):
         """ngspice_available must route through resolve_ngspice_path (direct monkeypatch)."""
-        import trustguard.ngspice as _mod
+        import spiceguard.ngspice as _mod
 
         monkeypatch.setattr(_mod, "resolve_ngspice_path", lambda explicit=None: "/patched/ng")
 
@@ -296,7 +296,7 @@ class TestNgspiceAvailable:
 
     def test_returns_false_when_resolve_raises_via_direct_patch(self, monkeypatch):
         """ngspice_available must return False when resolve_ngspice_path raises NgspiceNotFound."""
-        import trustguard.ngspice as _mod
+        import spiceguard.ngspice as _mod
 
         def fake_resolve(explicit=None):
             raise NgspiceNotFound("patched not found")

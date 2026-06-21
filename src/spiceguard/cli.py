@@ -1,13 +1,13 @@
 """
-Command-line interface for trustguard.
+Command-line interface for spiceguard.
 """
 import argparse
 import sys
 from pathlib import Path
 
-import trustguard
-from trustguard.core import evaluate, exit_code, report
-from trustguard.ngspice import NgspiceNotFound
+import spiceguard
+from spiceguard.core import evaluate, exit_code, report
+from spiceguard.ngspice import NgspiceNotFound
 
 # Known subcommands — detected manually before argparse so that positional
 # FILE arguments are never mistaken for subcommand choices.  On Python 3.9+,
@@ -42,22 +42,22 @@ def _build_parser():
     names on Python 3.9+.  The parser itself handles options and FILE paths.
     """
     parser = _ArgumentParser(
-        prog="trustguard",
+        prog="spiceguard",
         description="Evaluate SPICE netlists for simulation trustworthiness.",
         epilog=(
             "subcommands:\n"
-            "  trustguard kicad FILE...   KiCad post-simulation check — runs standard\n"
+            "  spiceguard kicad FILE...   KiCad post-simulation check — runs standard\n"
             "                             trust evaluation plus KiCad-specific preflight\n"
             "                             (e.g. ground-net mapping gotcha detection).\n"
             "                             Pass '-' as FILE to read from stdin:\n"
-            "                               kicad-cli sch export ... | trustguard kicad -"
+            "                               kicad-cli sch export ... | spiceguard kicad -"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version",
         action="version",
-        version=f"trustguard {trustguard.__version__}",
+        version=f"spiceguard {spiceguard.__version__}",
     )
     parser.add_argument(
         "--ngspice",
@@ -129,8 +129,8 @@ def main(argv=None):
         # kicad.check_kicad_netlist which is the single importable entry
         # point for preflight + evaluate + verdict calculation.
         # FILE '-' reads the netlist from STDIN, enabling the pipe workflow:
-        #   kicad-cli sch export netlist --format spice ... | trustguard kicad -
-        from trustguard import kicad as _kicad_mod
+        #   kicad-cli sch export netlist --format spice ... | spiceguard kicad -
+        from spiceguard import kicad as _kicad_mod
         codes = []
         try:
             for p in paths:
@@ -151,7 +151,7 @@ def main(argv=None):
             print(str(exc), file=sys.stderr)
             sys.exit(3)
         except (OSError, UnicodeDecodeError) as exc:
-            print(f"trustguard: error: cannot read input: {exc}", file=sys.stderr)
+            print(f"spiceguard: error: cannot read input: {exc}", file=sys.stderr)
             sys.exit(64)
         return _worst_exit_code(codes)
 
@@ -166,7 +166,7 @@ def main(argv=None):
         print(str(exc), file=sys.stderr)
         sys.exit(3)
     except (OSError, UnicodeDecodeError) as exc:
-        print(f"trustguard: error: cannot read input: {exc}", file=sys.stderr)
+        print(f"spiceguard: error: cannot read input: {exc}", file=sys.stderr)
         sys.exit(64)
 
     return _worst_exit_code(codes)

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from trustguard import ngspice as ng
-from trustguard.netlist import parse_and_flatten, MAX_SUBCKT_DEPTH
+from spiceguard import ngspice as ng
+from spiceguard.netlist import parse_and_flatten, MAX_SUBCKT_DEPTH
 
 
 # --- ngspice invocation hardening -------------------------------------------

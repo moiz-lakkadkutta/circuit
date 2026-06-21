@@ -1,5 +1,5 @@
 """
-Input-format front-end for trustguard.
+Input-format front-end for spiceguard.
 
 Two paths to a runnable SPICE netlist:
 
@@ -142,7 +142,7 @@ def asc_to_netlist(text):
         return net_name[root]
 
     # emit
-    lines = ["* converted from LTspice .asc by trustguard (experimental)"]
+    lines = ["* converted from LTspice .asc by spiceguard (experimental)"]
     need_diode_model = False
     for sym in symbols:
         if not sym.get("pins"):

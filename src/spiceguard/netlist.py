@@ -72,7 +72,7 @@ def parse_and_flatten(text, base_dir):
     # Lazy import to avoid circular import (checks imports from netlist).
     def _make_issue(severity, code, message):
         try:
-            from trustguard.checks import Issue  # noqa: PLC0415
+            from spiceguard.checks import Issue  # noqa: PLC0415
         except ImportError:
             from dataclasses import make_dataclass
             Issue = make_dataclass("Issue", ["severity", "code", "message"])

@@ -9,8 +9,8 @@ from collections import defaultdict
 
 import pytest
 
-from trustguard.netlist import parse_and_flatten
-from trustguard import checks
+from spiceguard.netlist import parse_and_flatten
+from spiceguard import checks
 
 NET = Path(__file__).parent / "netlists"
 RW = NET / "realworld"
@@ -200,7 +200,7 @@ def test_plain_netlist_unchanged():
     path = NET / "n5_healthy_control.cir"
     text = path.read_text()
 
-    from trustguard.netlist import parse_netlist
+    from spiceguard.netlist import parse_netlist
     elements_old, node_elems_old, _ = parse_netlist(text)
     elements_new, node_elems_new, parse_issues = parse_and_flatten(text, path.parent)
 

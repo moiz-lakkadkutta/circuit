@@ -1,5 +1,5 @@
 """
-Behavior tests for trustguard, run against REAL ngspice output.
+Behavior tests for spiceguard, run against REAL ngspice output.
 
 These are the honesty harness: they assert the verdict and the specific
 codes we expect on known-good and known-bad circuits. If a refactor breaks
@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-import trustguard as tg
-from trustguard import formats
+import spiceguard as tg
+from spiceguard import formats
 
 NET = Path(__file__).parent / "netlists"
 
