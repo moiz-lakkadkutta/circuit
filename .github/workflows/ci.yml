@@ -39,3 +39,20 @@ jobs:
         run: |
           pip install bandit
           bandit -r src/ -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t spiceguard -f docker/Dockerfile .
+      - name: Smoke test the image (ngspice bundled)
+        run: |
+          set -e
+          docker run --rm spiceguard --version
+          # healthy netlist → TRUSTWORTHY → exit 0
+          docker run --rm -v "$PWD/tests/netlists:/work" spiceguard n5_healthy_control.cir
+          # missing ground → SUSPECT → exit 2
+          code=0
+          docker run --rm -v "$PWD/tests/netlists:/work" spiceguard n1_missing_ground.cir || code=$?
+          test "$code" -eq 2 || { echo "expected SUSPECT (exit 2), got $code"; exit 1; }

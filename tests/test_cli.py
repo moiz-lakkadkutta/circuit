@@ -411,3 +411,26 @@ def test_kicad_nonexistent_file_exits_64_no_traceback(capsys):
     err = capsys.readouterr().err
     assert "cannot read" in err
     assert "Traceback" not in err
+
+
+# --- --json structured output ---
+
+def test_json_output_structure(monkeypatch, tmp_path, capsys):
+    import json as _json
+    from spiceguard.checks import Issue
+    r = make_result("SUSPECT")
+    r.issues = [Issue("FATAL", "no_ground", "No node '0' (ground).")]
+    patch_evaluate(monkeypatch, fixed_result=r)
+    f = tmp_path / "a.cir"
+    f.write_text("v1 a b 5\nr1 a b 1k\n.op\n.end\n")
+    from spiceguard.cli import main
+    code = main(["--json", str(f)])
+    assert code == 2  # SUSPECT
+    out = capsys.readouterr().out
+    data = _json.loads(out)
+    assert isinstance(data, list) and len(data) == 1
+    entry = data[0]
+    assert entry["verdict"] == "SUSPECT"
+    assert entry["path"].endswith("a.cir")
+    assert {"severity", "code", "message"} <= set(entry["issues"][0])
+    assert entry["issues"][0]["code"] == "no_ground"
