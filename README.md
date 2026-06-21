@@ -223,12 +223,29 @@ numerically but FAILED is the worst outcome).
 
 ## Security
 
-trustguard runs ngspice in batch mode on the netlists you give it. A SPICE
-netlist can contain `.control`/`shell` directives that execute arbitrary shell
-commands — so **only run trustguard on netlists you trust** (treat them with
-the same caution as running an arbitrary script). The printed log may include
-output emitted by such directives. trustguard does not sanitize or restrict
-ngspice's execution environment.
+trustguard runs ngspice in batch mode on the netlists you give it. **Treat a
+netlist like a script you are about to run**, because in two ways it is one:
+
+- A SPICE netlist can contain `.control`/`shell` directives that execute
+  arbitrary shell commands. The captured log may include their output.
+- `.include` reads whatever file path the netlist specifies (the same files
+  ngspice itself would read), so a hostile netlist can point at files on your
+  disk. The contents are parsed as a netlist, not printed.
+
+**Only run trustguard on netlists you trust.** It is a local dev/CI utility,
+not a sandbox.
+
+Hardening that *is* in place:
+
+- ngspice is invoked with `--no-spiceinit`, so a `.spiceinit`/`spice.rc` config
+  planted next to the netlist is **not** auto-executed.
+- The simulator is launched with a fixed argument list, **never** through a
+  shell (no `shell=True`), so the path can't be shell-injected.
+- A 120s timeout terminates a hung/non-converging run (reported as FAILED, not
+  a crash); temp files use `mkstemp` (0600) and are always cleaned up;
+  subcircuit nesting is depth-bounded against stack exhaustion.
+- trustguard has **no third-party runtime dependencies**, and the source passes
+  `bandit -r src/` with no findings (`pip-audit` reports no vulnerable deps).
 
 ---
 
