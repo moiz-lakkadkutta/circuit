@@ -1,0 +1,55 @@
+name: Publish to PyPI
+
+# Publishes spiceguard to PyPI when you create a GitHub Release.
+# Uses PyPI Trusted Publishing (OIDC) — no API tokens are stored anywhere.
+#
+# One-time setup on PyPI (https://pypi.org/manage/account/publishing/):
+#   PyPI Project Name : spiceguard
+#   Owner             : moiz-lakkadkutta
+#   Repository name   : circuit
+#   Workflow name     : publish.yml
+#   Environment name  : pypi
+# Add that as a "pending publisher", then publish a GitHub Release and this runs.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Validate metadata
+        run: |
+          python -m pip install --upgrade twine
+          twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
