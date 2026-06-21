@@ -1,4 +1,4 @@
-# circuit / trustguard
+# circuit / spiceguard
 
 This repo started as **CircuitCLI**, an image/photo-to-SPICE-simulation pipeline
 (YOLO + OCR + graph → ngspice). That idea was dropped after research showed the
@@ -10,14 +10,14 @@ trust-guard**.
 
 ---
 
-## What is trustguard?
+## What is spiceguard?
 
 Modern ngspice recovers from many classic convergence problems on its own — and
 when it can't, it often returns **exit code 0 with a plausible but wrong answer**
 (a relaxed fallback estimate, or arbitrary voltages on an ungrounded node).
 Nothing in the standard flow warns you.
 
-`trustguard` answers one question about a SPICE run: **can I trust this result?**
+`spiceguard` answers one question about a SPICE run: **can I trust this result?**
 
 It combines static netlist analysis, ngspice failure-log decoding (cryptic
 internal names translated to the real component plus a specific fix), and
@@ -41,30 +41,30 @@ brew install ngspice          # macOS; Linux: apt install ngspice
 pip install .
 ```
 
-This registers a `trustguard` command on your PATH. Alternatively, run directly
+This registers a `spiceguard` command on your PATH. Alternatively, run directly
 without installing (useful during development):
 
 ```bash
-PYTHONPATH=src python3 -m trustguard FILE...
+PYTHONPATH=src python3 -m spiceguard FILE...
 ```
 
 ---
 
 ## ngspice path resolution (priority order)
 
-trustguard locates the ngspice binary in this order:
+spiceguard locates the ngspice binary in this order:
 
 1. `--ngspice PATH` CLI flag — if given and not executable, raises an error immediately (no fallthrough)
 2. `$NGSPICE` environment variable — same hard-configured semantics; error if set but not usable
 3. `which ngspice` (PATH lookup)
 4. Legacy fallback `/opt/homebrew/bin/ngspice`
 
-If none of the above resolves to a usable binary, trustguard exits with code **3**
+If none of the above resolves to a usable binary, spiceguard exits with code **3**
 and prints a clear message listing what was tried. Install ngspice, or point to it
 explicitly:
 
 ```bash
-trustguard --ngspice /usr/local/bin/ngspice mynetlist.cir
+spiceguard --ngspice /usr/local/bin/ngspice mynetlist.cir
 # or
 export NGSPICE=/usr/local/bin/ngspice
 ```
@@ -74,12 +74,12 @@ export NGSPICE=/usr/local/bin/ngspice
 ## CLI usage
 
 ```
-trustguard [--ngspice PATH] [--version] [--help] FILE...
-trustguard kicad [--ngspice PATH] FILE...
+spiceguard [--ngspice PATH] [--version] [--help] FILE...
+spiceguard kicad [--ngspice PATH] FILE...
 ```
 
 Pass one or more netlist (or schematic) files. When multiple files are given,
-trustguard evaluates each in sequence and exits with the worst verdict across all.
+spiceguard evaluates each in sequence and exits with the worst verdict across all.
 
 ### Options
 
@@ -103,7 +103,7 @@ trustguard evaluates each in sequence and exits with the worst verdict across al
 ### Example
 
 ```
-$ PYTHONPATH=src python3 -m trustguard tests/netlists/n5_healthy_control.cir
+$ PYTHONPATH=src python3 -m spiceguard tests/netlists/n5_healthy_control.cir
 
 ======================================================================
 n5_healthy_control.cir
@@ -114,7 +114,7 @@ n5_healthy_control.cir
 ```
 
 ```
-$ PYTHONPATH=src python3 -m trustguard tests/netlists/n1_missing_ground.cir
+$ PYTHONPATH=src python3 -m spiceguard tests/netlists/n1_missing_ground.cir
 
 ======================================================================
 n1_missing_ground.cir
@@ -135,7 +135,7 @@ n1_missing_ground.cir
 | Any other netlist | ngspice natively translates KiCad, LTspice, PSpice, HSpice dialects |
 | `.asc` | Converted in-process (experimental — see below) |
 
-**LTspice `.asc` (experimental):** trustguard converts `.asc` schematics using
+**LTspice `.asc` (experimental):** spiceguard converts `.asc` schematics using
 built-in 2-pin symbol geometry (resistor, capacitor, inductor, diode, voltage
 source, current source). Net connectivity is recovered by union-find over
 wire/pin/flag coordinates. For anything beyond these built-in symbols, export
@@ -145,7 +145,7 @@ the end of the report so you can compare it against LTspice's own export.
 
 ### Subcircuit support (Feature B)
 
-trustguard's parser handles:
+spiceguard's parser handles:
 
 - `.subckt` / `.ends` block collection and extraction
 - `X`-instance flattening with automatic node namespacing (internal nodes become
@@ -165,7 +165,7 @@ Errors detected during subcircuit processing:
 ## KiCad workflow (Feature C)
 
 ```bash
-trustguard kicad myboard.cir
+spiceguard kicad myboard.cir
 ```
 
 The `kicad` subcommand runs the standard trust check **plus** a KiCad-specific
@@ -183,12 +183,12 @@ or place a `PWR_FLAG`).
 
 ```bash
 kicad-cli sch export netlist --format spice myboard.kicad_sch -o - \
-  | trustguard kicad -
+  | spiceguard kicad -
 ```
 
-**Important:** trustguard is a command-line workflow helper, not a native KiCad
+**Important:** spiceguard is a command-line workflow helper, not a native KiCad
 plugin. KiCad has no post-simulation event API, so there is no in-GUI integration;
-run `trustguard kicad` from your terminal or CI pipeline.
+run `spiceguard kicad` from your terminal or CI pipeline.
 
 ---
 
@@ -223,12 +223,29 @@ numerically but FAILED is the worst outcome).
 
 ## Security
 
-trustguard runs ngspice in batch mode on the netlists you give it. A SPICE
-netlist can contain `.control`/`shell` directives that execute arbitrary shell
-commands — so **only run trustguard on netlists you trust** (treat them with
-the same caution as running an arbitrary script). The printed log may include
-output emitted by such directives. trustguard does not sanitize or restrict
-ngspice's execution environment.
+spiceguard runs ngspice in batch mode on the netlists you give it. **Treat a
+netlist like a script you are about to run**, because in two ways it is one:
+
+- A SPICE netlist can contain `.control`/`shell` directives that execute
+  arbitrary shell commands. The captured log may include their output.
+- `.include` reads whatever file path the netlist specifies (the same files
+  ngspice itself would read), so a hostile netlist can point at files on your
+  disk. The contents are parsed as a netlist, not printed.
+
+**Only run spiceguard on netlists you trust.** It is a local dev/CI utility,
+not a sandbox.
+
+Hardening that *is* in place:
+
+- ngspice is invoked with `--no-spiceinit`, so a `.spiceinit`/`spice.rc` config
+  planted next to the netlist is **not** auto-executed.
+- The simulator is launched with a fixed argument list, **never** through a
+  shell (no `shell=True`), so the path can't be shell-injected.
+- A 120s timeout terminates a hung/non-converging run (reported as FAILED, not
+  a crash); temp files use `mkstemp` (0600) and are always cleaned up;
+  subcircuit nesting is depth-bounded against stack exhaustion.
+- spiceguard has **no third-party runtime dependencies**, and the source passes
+  `bandit -r src/` with no findings (`pip-audit` reports no vulnerable deps).
 
 ---
 

@@ -3,13 +3,41 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trustguard"
+name = "spiceguard"
 version = "0.1.0"
-description = "Answer one question about a SPICE run: can I trust this result?"
+description = "Can I trust this SPICE result? Catches silent/wrong ngspice simulation results."
+readme = "README.md"
 requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Moiz Lakkadkutta", email = "moizlakkadkutta1@gmail.com" }]
+keywords = [
+    "spice", "ngspice", "circuit", "simulation", "eda", "electronics",
+    "kicad", "ltspice", "netlist", "verification", "convergence",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/moiz-lakkadkutta/circuit"
+Repository = "https://github.com/moiz-lakkadkutta/circuit"
+Issues = "https://github.com/moiz-lakkadkutta/circuit/issues"
 
 [project.scripts]
-trustguard = "trustguard.cli:main"
+spiceguard = "spiceguard.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

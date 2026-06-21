@@ -1,5 +1,5 @@
 """
-KiCad post-simulation hook for trustguard (Task T5, feature C).
+KiCad post-simulation hook for spiceguard (Task T5, feature C).
 
 Public API
 ----------
@@ -15,8 +15,8 @@ check_kicad_netlist(path_or_text, ngspice_path=None) -> Result
 import tempfile
 from pathlib import Path
 
-from trustguard.checks import Issue
-from trustguard.netlist import NODE_COUNT
+from spiceguard.checks import Issue
+from spiceguard.netlist import NODE_COUNT
 
 # Ground-ish net names that KiCad commonly uses instead of the required node '0'.
 # Checked case-insensitively against node tokens found in the netlist.
@@ -33,7 +33,7 @@ def kicad_preflight(netlist_text: str) -> "list[Issue]":
     yielding wrong voltages without an error.
 
     Fix instructions are embedded in the Issue message so that users running
-    ``trustguard kicad`` from the command line get actionable KiCad guidance.
+    ``spiceguard kicad`` from the command line get actionable KiCad guidance.
     """
     issues: list[Issue] = []
 
@@ -92,14 +92,14 @@ def check_kicad_netlist(path_or_text, ngspice_path=None):
     Returns
     -------
     Result
-        A trustguard Result with any kicad_preflight findings merged in before
+        A spiceguard Result with any kicad_preflight findings merged in before
         the verdict is computed.  A ``kicad_ground_not_zero`` WARN on an
         otherwise-clean netlist will yield SUSPECT, not TRUSTWORTHY.
     """
     # Lazy import to keep kicad.py importable without pulling in the full
     # core/ngspice stack at module load time (useful in KiCad Python console).
-    from trustguard.core import evaluate, verdict_from
-    from trustguard import formats as _formats
+    from spiceguard.core import evaluate, verdict_from
+    from spiceguard import formats as _formats
 
     p = Path(str(path_or_text))
     try:

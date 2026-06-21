@@ -12,6 +12,11 @@ NODE_COUNT = {
     "S": 4, "W": 4, "T": 4,
 }
 
+# Cap on subcircuit instantiation nesting depth. A cycle is already caught by
+# the ancestor_chain guard; this bounds pathologically deep *acyclic* nesting so
+# a crafted netlist can't exhaust the Python recursion stack (RecursionError).
+MAX_SUBCKT_DEPTH = 50
+
 
 @dataclass
 class Element:
@@ -67,7 +72,7 @@ def parse_and_flatten(text, base_dir):
     # Lazy import to avoid circular import (checks imports from netlist).
     def _make_issue(severity, code, message):
         try:
-            from trustguard.checks import Issue  # noqa: PLC0415
+            from spiceguard.checks import Issue  # noqa: PLC0415
         except ImportError:
             from dataclasses import make_dataclass
             Issue = make_dataclass("Issue", ["severity", "code", "message"])
@@ -120,7 +125,9 @@ def parse_and_flatten(text, base_dir):
                         inc_text = inc_path.read_text()
                         visited.add(inc_path)
                         result.extend(_load_lines(inc_text, inc_path.parent, visited))
-                    except (OSError, IOError) as exc:
+                    except (OSError, UnicodeDecodeError) as exc:
+                        # OSError: missing/unreadable/dir. UnicodeDecodeError: a
+                        # binary file pointed at by a (mistaken or hostile) include.
                         parse_issues.append(_make_issue("WARN", "missing_include",
                             f".include '{fname}' could not be read: {exc}"))
                     continue
@@ -223,6 +230,11 @@ def parse_and_flatten(text, base_dir):
         instance_name: str used to namespace internal nodes
         ancestor_chain: frozenset of subckt names being expanded (cycle guard)
         """
+        if len(ancestor_chain) > MAX_SUBCKT_DEPTH:
+            parse_issues.append(_make_issue("WARN", "subckt_too_deep",
+                f"Subcircuit nesting exceeded {MAX_SUBCKT_DEPTH} levels at "
+                f"instance '{instance_name}'. Stopping expansion here."))
+            return []
         flat = []
         for line in body_lines:
             s = line.strip()

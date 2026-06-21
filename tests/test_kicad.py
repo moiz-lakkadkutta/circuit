@@ -1,5 +1,5 @@
 """
-Tests for trustguard.kicad — KiCad post-simulation hook (Task T5, feature C).
+Tests for spiceguard.kicad — KiCad post-simulation hook (Task T5, feature C).
 
 Pure preflight tests require no ngspice.
 Integration tests (check_kicad_netlist, CLI end-to-end) are gated by
@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-import trustguard as tg
-from trustguard.kicad import kicad_preflight
+import spiceguard as tg
+from spiceguard.kicad import kicad_preflight
 
 NET = Path(__file__).parent / "netlists"
 RW = NET / "realworld"
@@ -185,7 +185,7 @@ def test_preflight_kicad_subckt_fixture_no_finding():
 @requires_ngspice
 def test_check_kicad_netlist_subckt_trustworthy():
     """kicad_subckt.cir via check_kicad_netlist must yield TRUSTWORTHY."""
-    from trustguard.kicad import check_kicad_netlist
+    from spiceguard.kicad import check_kicad_netlist
     result = check_kicad_netlist(str(RW / "kicad_subckt.cir"))
     assert result.verdict == "TRUSTWORTHY", (
         f"Expected TRUSTWORTHY, got {result.verdict}. Issues: {result.issues}"
@@ -195,7 +195,7 @@ def test_check_kicad_netlist_subckt_trustworthy():
 @requires_ngspice
 def test_check_kicad_netlist_gnd_suspect():
     """kicad_gnd.cir via check_kicad_netlist must be SUSPECT (preflight WARN)."""
-    from trustguard.kicad import check_kicad_netlist
+    from spiceguard.kicad import check_kicad_netlist
     result = check_kicad_netlist(str(RW / "kicad_gnd.cir"))
     assert result.verdict in ("SUSPECT", "FAILED"), (
         f"Expected SUSPECT/FAILED, got {result.verdict}"
@@ -249,8 +249,8 @@ def test_check_kicad_netlist_uses_converted_text(monkeypatch, tmp_path):
     If the buggy path (p.read_text()) is used, the finding is absent;
     if the fixed path (load_as_netlist) is used, the finding is present.
     """
-    from trustguard.core import Result
-    from trustguard.kicad import check_kicad_netlist
+    from spiceguard.core import Result
+    from spiceguard.kicad import check_kicad_netlist
 
     # Raw file: uses node 0 — preflight would NOT fire on this text.
     raw_text = (
@@ -262,7 +262,7 @@ def test_check_kicad_netlist_uses_converted_text(monkeypatch, tmp_path):
     )
     # Converted text: GND net, no node 0 — preflight SHOULD fire on this.
     converted_text = (
-        "* converted by trustguard (mock)\n"
+        "* converted by spiceguard (mock)\n"
         "V1 VIN GND DC 5\n"
         "R1 VIN GND 1k\n"
         ".op\n"
@@ -274,12 +274,12 @@ def test_check_kicad_netlist_uses_converted_text(monkeypatch, tmp_path):
 
     # Patch load_as_netlist to return converted_text instead of raw_text.
     monkeypatch.setattr(
-        "trustguard.formats.load_as_netlist",
+        "spiceguard.formats.load_as_netlist",
         lambda path: (converted_text, "mock-converted", []),
     )
     # Patch evaluate so no ngspice binary is needed.
     monkeypatch.setattr(
-        "trustguard.core.evaluate",
+        "spiceguard.core.evaluate",
         lambda path, ngspice_path=None: Result(
             path=path, verdict="TRUSTWORTHY", rc=0,
         ),
@@ -298,11 +298,11 @@ def test_check_kicad_netlist_uses_converted_text(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_kicad_cli_stdin_gnd_preflight(monkeypatch, capsys):
-    """trustguard kicad - reads stdin; GND fixture triggers kicad_ground_not_zero SUSPECT.
+    """spiceguard kicad - reads stdin; GND fixture triggers kicad_ground_not_zero SUSPECT.
 
     The kicad CLI branch now delegates to kicad.check_kicad_netlist, which
-    lazily imports evaluate from trustguard.core.  Patch trustguard.core.evaluate
-    (not trustguard.cli.evaluate) to avoid running real ngspice.
+    lazily imports evaluate from spiceguard.core.  Patch spiceguard.core.evaluate
+    (not spiceguard.cli.evaluate) to avoid running real ngspice.
     """
     text = (RW / "kicad_gnd.cir").read_text()
     monkeypatch.setattr("sys.stdin", StringIO(text))
@@ -310,13 +310,13 @@ def test_kicad_cli_stdin_gnd_preflight(monkeypatch, capsys):
     # Mock evaluate via the core module so check_kicad_netlist's lazy import
     # picks it up; return a clean TRUSTWORTHY base so kicad_preflight determines
     # the final verdict.
-    from trustguard.core import Result
+    from spiceguard.core import Result
     monkeypatch.setattr(
-        "trustguard.core.evaluate",
+        "spiceguard.core.evaluate",
         lambda path, ngspice_path=None: Result(path=path, verdict="TRUSTWORTHY", rc=0),
     )
 
-    from trustguard.cli import main
+    from spiceguard.cli import main
     code = main(["kicad", "-"])
     assert code == 2, f"Expected exit 2 (SUSPECT), got {code}"
     captured = capsys.readouterr()

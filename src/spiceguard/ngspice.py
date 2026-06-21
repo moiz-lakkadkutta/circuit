@@ -3,11 +3,13 @@ ngspice runner and availability helpers.
 """
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - used to invoke ngspice with a fixed argv (no shell)
 import tempfile
-from pathlib import Path
 
 NGSPICE = "/opt/homebrew/bin/ngspice"
+
+# Wall-clock cap so a non-converging / hanging simulation can't block forever.
+NGSPICE_TIMEOUT = 120
 
 
 class NgspiceNotFound(Exception):
@@ -82,18 +84,38 @@ def ngspice_available(ngspice_path=None):
 def run_ngspice_text(text, ngspice_path=None, cwd=None):
     """Run a netlist string through ngspice batch mode via a temp file.
 
-    Returns (returncode, combined_log_text).
-    Raises NgspiceNotFound if no usable binary is available.
+    Returns (returncode, combined_log_text). A timeout is reported as a
+    non-zero return code with an explanatory log (never an exception to the
+    caller). Raises NgspiceNotFound if no usable binary is available.
+
+    Security: ngspice is invoked with ``--no-spiceinit`` so it does NOT
+    auto-load a ``.spiceinit`` / ``spice.rc`` config from the working directory
+    or home — otherwise a config file planted next to the netlist could execute
+    arbitrary commands. (Note: a netlist's own ``.control``/``shell`` blocks can
+    still run code — only check netlists you trust; see the README.)
     """
     binary = resolve_ngspice_path(explicit=ngspice_path)
-    with tempfile.NamedTemporaryFile("w", suffix=".cir", delete=False) as f:
-        f.write(text)
-        tmp = f.name
+    fd, tmp = tempfile.mkstemp(suffix=".cir")
     try:
-        kwargs = dict(capture_output=True, text=True, timeout=120)
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        kwargs = dict(capture_output=True, text=True, timeout=NGSPICE_TIMEOUT)
         if cwd is not None:
             kwargs["cwd"] = cwd
-        p = subprocess.run([binary, "-b", tmp], **kwargs)
+        try:
+            # Fixed argv, shell=False; `binary` is a user-chosen simulator path,
+            # `tmp` is our own temp file. -n / --no-spiceinit disables config
+            # auto-loading.
+            p = subprocess.run([binary, "-b", "-n", tmp], **kwargs)  # nosec B603
+        except subprocess.TimeoutExpired:
+            return 124, (
+                f"ngspice timed out after {NGSPICE_TIMEOUT}s and was terminated. "
+                f"The simulation is likely hanging (e.g. a non-converging "
+                f"transient). Treat this result as FAILED."
+            )
         return p.returncode, p.stdout + p.stderr
     finally:
-        Path(tmp).unlink(missing_ok=True)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass

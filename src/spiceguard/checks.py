@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
-from trustguard.netlist import nodes_with_dc_path_to_ground
+from spiceguard.netlist import nodes_with_dc_path_to_ground
 
 
 @dataclass

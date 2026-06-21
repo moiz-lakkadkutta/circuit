@@ -4,10 +4,10 @@ Core evaluation orchestration: Result, evaluate, exit_code, report.
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from trustguard import formats
-from trustguard.checks import Issue, extract_signals, static_checks, log_checks, silent_checks
-from trustguard.netlist import parse_and_flatten
-from trustguard.ngspice import run_ngspice_text
+from spiceguard import formats
+from spiceguard.checks import Issue, extract_signals, static_checks, log_checks, silent_checks
+from spiceguard.netlist import parse_and_flatten
+from spiceguard.ngspice import run_ngspice_text
 
 SEVERITY_ORDER = {"FATAL": 0, "SILENT": 1, "WARN": 2, "INFO": 3}
 TRUST_BREAKING = {"FATAL", "SILENT", "WARN"}  # INFO never lowers the verdict
