@@ -6,6 +6,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
+from spiceguard.sanitize import INCLUDE_DIRECTIVE
+
 NODE_COUNT = {
     "R": 2, "C": 2, "L": 2, "V": 2, "I": 2, "D": 2,
     "B": 2, "Q": 3, "J": 3, "M": 4, "E": 4, "G": 4,
@@ -102,14 +104,19 @@ def parse_and_flatten(text, base_dir):
             else:
                 raw_lines.append(s)
 
-        # Process .include directives.
-        # Match ".include" or ".inc" as whole directive tokens (word-boundary)
-        # to avoid over-matching directives like ".initial", ".incantation", etc.
+        # Process file-splicing directives (.include/.inc*/.lib) using the
+        # same INCLUDE_DIRECTIVE pattern sanitize.py strips in no-exec mode,
+        # so the parser never silently ignores content a hostile/legit
+        # netlist pulls in via `.incl`, `.inclu`, `.includ`, or `.lib` (the
+        # old `\.(include|inc)\b` pattern missed those spellings entirely).
+        # `.endl` (the `.lib` block terminator) has no filename to resolve;
+        # it falls through unmatched below and is ignored downstream like
+        # any other dot-directive line.
         result = []
         for line in raw_lines:
             sl = line.lower()
-            if re.match(r'\.(include|inc)\b', sl):
-                m = re.match(r'\.inc(?:lude)?\s+"?([^"\s]+)"?', line, re.I)
+            if INCLUDE_DIRECTIVE.match(sl):
+                m = re.match(r'\.(?:inc[a-z]*|lib)\s+"?([^"\s]+)"?', line, re.I)
                 if m:
                     fname = m.group(1).strip()
                     if re.match(r'https?://', fname, re.I) or re.match(r'ftp://', fname, re.I):

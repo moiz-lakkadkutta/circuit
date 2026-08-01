@@ -45,10 +45,11 @@ def evaluate_text(text, ngspice_path=None, no_exec=False, label="<netlist>",
                   cwd=None, extra_issues=None):
     """Evaluate a netlist given as text and return a Result.
 
-    no_exec=True strips .control blocks and .include lines BEFORE parsing and
-    simulation (see sanitize.py) — required for untrusted input (MCP, CI on
-    PR-submitted netlists). Stripping is recorded as an INFO issue and never
-    changes the verdict.
+    no_exec=True strips .control blocks and file-splicing directive lines
+    (.include/.inc*/.lib/.endl) BEFORE parsing and simulation (see
+    sanitize.py) — required for untrusted input (MCP, CI on PR-submitted
+    netlists). Stripping is recorded as an INFO issue and never changes the
+    verdict.
     """
     issues = list(extra_issues) if extra_issues else []
     if no_exec:
@@ -58,8 +59,8 @@ def evaluate_text(text, ngspice_path=None, no_exec=False, label="<netlist>",
             issues.append(Issue(
                 "INFO", "no_exec_stripped",
                 f"no-exec mode removed {san.removed_blocks} .control block(s) "
-                f"and {len(san.removed_includes)} .include line(s) before "
-                f"simulation; results may differ from a full run."))
+                f"and {len(san.removed_includes)} file-splicing directive(s) "
+                f"before simulation; results may differ from a full run."))
 
     base_dir = cwd if cwd is not None else Path(".")
     elements, node_elems, parse_issues = parse_and_flatten(text, base_dir)
