@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spiceguard — can you trust that SPICE result?</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>ngspice said exit 0.<br>The answer was still wrong.</h1>
+  <p class="lead">
+    Modern ngspice recovers from many problems on its own — and when it can't,
+    it often returns <strong>exit code 0 with a plausible but wrong answer</strong>:
+    a relaxed fallback estimate, or arbitrary voltages on an ungrounded node.
+    Nothing warns you. <code>spiceguard</code> answers one question:
+    <em>can I trust this result?</em>
+  </p>
+
+  <section id="demo">
+    <h2>Try it — right here, no install</h2>
+    <p>Static checks run in your browser via Pyodide. Nothing is uploaded.</p>
+    <textarea id="netlist" rows="10" spellcheck="false">* AI-generated "voltage divider" — spot the problem
+v1 1 2 9
+r1 1 2 10k
+r2 2 3 4.7k
+.op
+.end</textarea>
+    <button id="check" disabled>Loading Python…</button>
+    <pre id="result" hidden></pre>
+    <p class="fineprint">Static checks only — the full CLI also runs the
+      simulation and decodes ngspice's failure log.
+      <code>pip install spiceguard</code></p>
+  </section>
+
+  <section id="waitlist">
+    <h2>Trust checks where you actually need them</h2>
+    <p>We're building spiceguard into CI pipelines and AI-agent workflows.
+       Join the beta list:</p>
+    <form id="signup" action="https://formspree.io/f/FORMSPREE_ID" method="POST">
+      <input type="email" name="email" required placeholder="you@company.com">
+      <select name="usage" required>
+        <option value="" disabled selected>How would you use this?</option>
+        <option value="ci">CI checks on pull requests</option>
+        <option value="ai-agent">Verifying AI-generated circuits</option>
+        <option value="editor">Checks in my editor</option>
+        <option value="other">Something else</option>
+      </select>
+      <input type="hidden" name="src" id="src-field" value="direct">
+      <button type="submit">Join the beta</button>
+    </form>
+  </section>
+
+  <footer>
+    <a href="https://github.com/moiz-lakkadkutta/circuit">GitHub</a> ·
+    <a href="https://pypi.org/project/spiceguard/">PyPI</a> · MIT licensed ·
+    zero runtime dependencies
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

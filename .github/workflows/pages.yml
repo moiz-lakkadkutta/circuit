@@ -1,0 +1,35 @@
+name: Deploy site
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "src/**", "pyproject.toml", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Build wheel into site/wheels
+        run: |
+          python -m pip install build
+          python -m build --wheel --outdir site/wheels
+          ls site/wheels
+      - name: Point the page at the built wheel
+        run: |
+          WHEEL=$(basename site/wheels/*.whl)
+          sed -i "s|wheels/spiceguard-[^\"']*\.whl|wheels/$WHEEL|" site/app.js
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deployment
+        uses: actions/deploy-pages@v4

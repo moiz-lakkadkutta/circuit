@@ -1,0 +1,13 @@
+:root { color-scheme: light dark; }
+body { font: 16px/1.6 system-ui, sans-serif; margin: 0; }
+main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+h1 { font-size: 2rem; line-height: 1.2; }
+.lead { font-size: 1.1rem; }
+textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 0.9rem;
+  box-sizing: border-box; }
+button { padding: 0.6rem 1.2rem; font-size: 1rem; cursor: pointer; }
+pre { background: rgba(127,127,127,0.12); padding: 1rem; overflow-x: auto; }
+form { display: grid; gap: 0.5rem; max-width: 24rem; }
+input, select { padding: 0.5rem; font-size: 1rem; }
+.fineprint { font-size: 0.85rem; opacity: 0.75; }
+footer { margin-top: 3rem; font-size: 0.9rem; opacity: 0.8; }
