@@ -1,0 +1,17 @@
+* Half-wave rectifier: 1N4148 diode + smoothing capacitor, 50 Hz supply
+
+V1 ac_in 0 SIN(0 15 50 0 0)
+D1 ac_in vout 1N4148
+C1 vout 0 220u IC=0
+R1 vout 0 2.2k
+
+.model 1N4148 D(IS=2.52e-9 RS=0.568 N=1.752 CJO=4e-12 M=0.4 TT=20e-9 BV=100 IBV=1e-5)
+
+.tran 0.5m 100m UIC
+
+.control
+run
+plot v(ac_in) v(vout)
+.endc
+
+.end

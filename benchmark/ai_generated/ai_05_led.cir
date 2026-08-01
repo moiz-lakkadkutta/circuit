@@ -1,0 +1,18 @@
+* LED with current-limiting resistor, 5V supply
+* Standard red LED: Vf ~ 2V, If ~ 20mA
+* R = (5V - 2V) / 20mA = 150 ohm
+
+V1 vcc 0 DC 5
+R1 vcc anode 150
+D1 anode 0 LED
+
+.model LED D(IS=1e-20 N=2 RS=1 BV=5 IBV=1e-4)
+
+.op
+
+.control
+run
+print v(anode) i(V1)
+.endc
+
+.end

@@ -1,0 +1,25 @@
+* NPN Common-Emitter Amplifier - 12V supply rail
+* Voltage divider bias, bias point shown via .op
+
+Vcc 1 0 12
+R1 1 2 100k
+R2 2 0 22k
+Rc 1 3 3.3k
+Re 4 0 1.2k
+Q1 3 2 4 2N2222
+
+Cin 5 2 1u
+Vin 5 0 AC 1 SIN(0 0.005 1000)
+Cout 3 6 1u
+RL 6 0 10k
+
+.model 2N2222 NPN(IS=14.34f BF=255.9 VAF=74.03 IKF=0.2847 NE=1.307 ISE=14.34f)
+
+.op
+
+.control
+run
+show all
+.endc
+
+.end

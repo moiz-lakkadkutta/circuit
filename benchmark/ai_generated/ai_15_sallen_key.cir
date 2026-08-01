@@ -1,0 +1,35 @@
+* Two-stage (4th order) Sallen-Key Low-Pass Filter, fc = 10kHz
+* Uses an ideal op-amp subcircuit, instantiated twice
+
+.subckt OPAMP inp inn out
+Eop out 0 inp inn 100k
+.ends OPAMP
+
+Vcc vcc 0 12
+Vee vee 0 -12
+Vin in 0 AC 1 SIN(0 1 1000)
+
+* Stage 1
+R1 in n1 16k
+R2 n1 n2 16k
+C1 n1 out1 1n
+C2 n2 0 1n
+Xop1 n2 out1 out1 OPAMP
+
+* Stage 2
+R3 out1 n3 16k
+R4 n3 n4 16k
+C3 n3 out2 1n
+C4 n4 0 1n
+Xop2 n4 out2 out2 OPAMP
+
+Rload out2 0 10k
+
+.ac dec 20 10 1meg
+
+.control
+run
+plot db(v(out2))
+.endc
+
+.end
