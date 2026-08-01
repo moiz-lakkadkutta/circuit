@@ -21,6 +21,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest
+      # mcp (the MCP server's only runtime dep) requires Python >=3.10, so it
+      # can't be installed on the 3.9 leg at all. Install it on the newest
+      # leg only so tests/test_mcp_impl.py actually executes somewhere in CI
+      # instead of relying on pytest.importorskip("mcp") to skip everywhere.
+      - name: Install mcp (MCP server tests; needs Python >=3.10)
+        if: matrix.python-version == '3.12'
+        run: pip install "mcp>=1.0,<2.0"
       # ngspice is intentionally NOT installed: the integration tests skip when
       # the binary is absent (see tests/conftest.py), so this run exercises the
       # ~66 pure-logic tests deterministically, independent of any ngspice

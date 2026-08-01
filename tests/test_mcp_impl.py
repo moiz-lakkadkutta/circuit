@@ -4,6 +4,13 @@ from pathlib import Path
 
 import pytest
 
+# mcp (mcp.server.fastmcp, pulled in by spiceguard_mcp.server) requires
+# Python >=3.10 and is not installed on every CI leg (notably the 3.9 leg,
+# which cannot install it at all). Skip this whole module cleanly rather
+# than letting the import below raise a collection error that would zero
+# out the entire pytest run.
+pytest.importorskip("mcp")
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "mcp-server" / "src"))
 
 from spiceguard import core  # noqa: E402
