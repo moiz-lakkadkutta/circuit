@@ -344,7 +344,7 @@ def test_kicad_cli_delegates_to_check_kicad_netlist(monkeypatch, capsys):
     from spiceguard.core import Result
     mock_calls = []
 
-    def fake_check(path_or_text, ngspice_path=None):
+    def fake_check(path_or_text, ngspice_path=None, no_exec=False):
         mock_calls.append(str(path_or_text))
         return Result(path=str(path_or_text), verdict="TRUSTWORTHY", rc=0)
 

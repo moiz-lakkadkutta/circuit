@@ -205,6 +205,73 @@ def test_check_kicad_netlist_gnd_suspect():
 
 
 # ---------------------------------------------------------------------------
+# no_exec threading: `spiceguard kicad --no-exec` must actually sanitize
+# (previously cli.py accepted the flag but never passed it to
+# check_kicad_netlist, so it silently did nothing on the kicad path).
+# ---------------------------------------------------------------------------
+
+def test_check_kicad_netlist_no_exec_never_reaches_ngspice_unsanitized(monkeypatch):
+    """A hostile netlist run through check_kicad_netlist(no_exec=True) must
+    never let its .control/.include content reach run_ngspice_text."""
+    from spiceguard import core
+    from spiceguard.kicad import check_kicad_netlist
+
+    seen = {}
+
+    def fake_run(text, ngspice_path=None, cwd=None):
+        seen["text"] = text
+        return 0, "No. of Data Rows : 1\n"
+
+    monkeypatch.setattr(core, "run_ngspice_text", fake_run)
+
+    hostile = (
+        "v1 1 0 5\n"
+        "r1 1 0 1k\n"
+        ".control\n"
+        "shell echo pwned\n"
+        ".endc\n"
+        ".include /etc/passwd\n"
+        ".op\n"
+        ".end\n"
+    )
+    check_kicad_netlist(hostile, no_exec=True)
+    assert "text" in seen, "run_ngspice_text was never called"
+    assert "shell" not in seen["text"]
+    assert ".control" not in seen["text"]
+    assert ".include" not in seen["text"]
+
+
+def test_kicad_cli_no_exec_flag_never_reaches_ngspice_unsanitized(monkeypatch, capsys):
+    """`spiceguard kicad --no-exec -` must thread the flag all the way to
+    ngspice input, matching the flag's behaviour on the default review path."""
+    from spiceguard import core
+    from spiceguard.cli import main
+
+    seen = {}
+
+    def fake_run(text, ngspice_path=None, cwd=None):
+        seen["text"] = text
+        return 0, "No. of Data Rows : 1\n"
+
+    monkeypatch.setattr(core, "run_ngspice_text", fake_run)
+
+    hostile = (
+        "v1 1 0 5\n"
+        "r1 1 0 1k\n"
+        ".control\n"
+        "shell echo pwned\n"
+        ".endc\n"
+        ".op\n"
+        ".end\n"
+    )
+    monkeypatch.setattr("sys.stdin", StringIO(hostile))
+    main(["kicad", "--no-exec", "-"])
+    assert "text" in seen, "run_ngspice_text was never called"
+    assert "shell" not in seen["text"]
+    assert ".control" not in seen["text"]
+
+
+# ---------------------------------------------------------------------------
 # CLI kicad subcommand — stdin ('-') support (monkeypatched)
 # ---------------------------------------------------------------------------
 
@@ -280,7 +347,7 @@ def test_check_kicad_netlist_uses_converted_text(monkeypatch, tmp_path):
     # Patch evaluate so no ngspice binary is needed.
     monkeypatch.setattr(
         "spiceguard.core.evaluate",
-        lambda path, ngspice_path=None: Result(
+        lambda path, ngspice_path=None, no_exec=False: Result(
             path=path, verdict="TRUSTWORTHY", rc=0,
         ),
     )
@@ -313,7 +380,7 @@ def test_kicad_cli_stdin_gnd_preflight(monkeypatch, capsys):
     from spiceguard.core import Result
     monkeypatch.setattr(
         "spiceguard.core.evaluate",
-        lambda path, ngspice_path=None: Result(path=path, verdict="TRUSTWORTHY", rc=0),
+        lambda path, ngspice_path=None, no_exec=False: Result(path=path, verdict="TRUSTWORTHY", rc=0),
     )
 
     from spiceguard.cli import main

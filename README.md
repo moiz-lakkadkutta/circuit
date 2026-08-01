@@ -75,8 +75,8 @@ export NGSPICE=/usr/local/bin/ngspice
 ## CLI usage
 
 ```
-spiceguard [--ngspice PATH] [--version] [--help] FILE...
-spiceguard kicad [--ngspice PATH] FILE...
+spiceguard [--ngspice PATH] [--no-exec] [--version] [--help] FILE...
+spiceguard kicad [--ngspice PATH] [--no-exec] FILE...
 ```
 
 Pass one or more netlist (or schematic) files. When multiple files are given,
@@ -89,7 +89,7 @@ spiceguard evaluates each in sequence and exits with the worst verdict across al
 | `FILE...` | One or more netlist or schematic files to check |
 | `--ngspice PATH` | Explicit path to the ngspice binary |
 | `--json` | Emit results as a JSON array (for editors, CI, tooling) |
-| `--no-exec` | Strip .control/.include before simulation — for netlists you did not write |
+| `--no-exec` | Strip `.control` blocks and file-splicing directives (`.include`/`.inc*`/`.lib`) before simulation — for netlists you did not write; applies to both the default review mode and `spiceguard kicad` |
 | `--version` | Print version and exit |
 | `--help` | Show usage |
 
