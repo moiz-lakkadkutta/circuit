@@ -65,6 +65,21 @@ Notable repos (10): `fossi-foundation/globalfoundries-pdk-libs-gf180mcu_fd_pr`,
 `ucb-substrate/substrate`, `ankur-gupta-29/ngspice_sim`, `danchitnis/ngspice`,
 `ra3xdh/qucs_s`, `hdl/conda-eda`, `NyanCAD/Mosaic`.
 
+**On-topic count for this query, defined and derived:** "on-topic" here means
+cluster 2 only — a workflow that runs ngspice as part of an open-PDK
+device/IP regression check (cluster 1, tooling/dependency repos, and
+cluster 3, incidental matches, are excluded because they aren't evidence of
+*anyone gating on a simulation result*, which is the thing angle B cares
+about). Cluster 2 has **5 repos** in the 30-item sample:
+`fossi-foundation/globalfoundries-pdk-libs-gf180mcu_fd_pr`,
+`sgherbst/sky130-hello-world`, `iic-jku/SG13CMOS_SPARX`,
+`ucb-substrate/sram22`, `ucb-substrate/substrate`. This is a **lower bound**,
+since only 30 of the 212 raw-indexed hits were manually inspected — the true
+on-topic count within the full 212 is almost certainly higher, but this
+report only tallies confirmed (manually inspected) hits rather than
+extrapolating from the sample ratio, to avoid overstating the total. None of
+these 5 repos overlap with the Q3/Q3b repo lists below (checked by name).
+
 ### Query 2 — `"kicad-cli sch export netlist"` in `.github/workflows`
 
 Query: `gh api 'search/code?q=%22kicad-cli+sch+export+netlist%22+path:.github/workflows'`
@@ -136,18 +151,33 @@ downstream package-index mirrors.
 
 ## Totals and verdict inputs
 
-| Query | Raw index count | Real/on-topic hits | Segment concentration |
-|---|---|---|---|
-| Q1 `ngspice` in workflows | 212 | ~15-20 substantive (rest tooling/noise) of inspected sample | mixed: open-PDK + tooling repos, few PCB-hobbyist |
-| Q2 `kicad-cli sch export netlist` | 10 | 7 distinct repos | 100% PCB/KiCad hobbyist, **0% doing result trust-checks** |
-| Q3 CACE (filtered) | 54 raw → 14 real | 14 | 100% open-PDK |
-| Q3b CACE+ngspice combined | 2 | 2 | 100% open-PDK |
-| Q4 "spiceguard" | 70 raw → 0 real | 0 | n/a |
+"On-topic" is defined per-query above; in every case it means "a workflow
+that runs an open-PDK/analog simulation as part of a CI-gated check," not
+merely a text match. Each row's on-topic count is either a complete
+enumeration (Q2, Q3, Q3b, Q4 — GitHub returned every item, or the filtering
+was exhaustive over the returned set) or an explicit lower-bound sample
+count (Q1 — only 30 of 212 raw hits were manually inspected; see Query 1
+above for the derivation).
 
-**Total real, on-topic hits across all queries: ~21-25** (14 CACE + 7 KiCad-CI
-+ a handful of the ngspice-in-workflows sample not already double-counted in
-the CACE set), against a backdrop where GitHub's own index is a known
-undercount (default-branch-only, indexing lag).
+| Query | Raw index count | On-topic hits | How derived | Segment concentration |
+|---|---|---|---|---|
+| Q1 `ngspice` in workflows | 212 | **5** (lower bound, from a 30-item manual sample) | Cluster-2 repos in the sample; clusters 1 (tooling/dependency) and 3 (incidental) excluded as not gating on a result | open-PDK |
+| Q2 `kicad-cli sch export netlist` | 10 | **7** (complete — all 10 raw hits map to 7 distinct repos) | Manual inspection of all 10 hits, none assert on simulation output | 100% PCB/KiCad hobbyist, **0% doing result trust-checks** |
+| Q3 CACE (filtered) | 54 raw (noisy, `cacert*` substring collisions) | **14** (complete enumeration of the 54 raw hits) | Regex-filtered to exact `cace.yml`/`cace.yaml` paths | 100% open-PDK |
+| Q3b CACE+ngspice combined | 2 | **2** (complete — GitHub returned exactly 2 raw hits, both on-topic) | Manual inspection, both are IHP-PDK regression jobs | 100% open-PDK |
+| Q4 "spiceguard" | 70 raw | **0** | Manual inspection of all 70 hits — all are either our own repo or unrelated name collisions | n/a |
+
+**Total on-topic hits across all queries: 5 + 7 + 14 + 2 + 0 = 28.**
+Repo-name cross-check confirms no overlap between the Q1 sample's 5, Q3's 14,
+and Q3b's 2 (three disjoint sets, summed directly with no double-counting).
+This total is itself a **floor**, not a ceiling: Q1 alone was only 30%
+sampled, and GitHub's index is a known undercount (default-branch-only,
+indexing lag) on top of that — so the true population is at least 28 and
+plausibly larger, concentrated overwhelmingly in the open-PDK segment (16 of
+the 28, i.e. Q3+Q3b, come from queries that specifically target open-PDK
+CACE workflows; the generic ngspice query (Q1) also resolved entirely to
+open-PDK hits in its sampled on-topic set; only Q2's 7 are PCB/KiCad, and
+those 7 have zero existing result-gating to extend).
 
 The open-PDK segment (CACE + ngspice in PDK IP-block CI) is the only segment
 where hits are concentrated, homogeneous, and already exercising a
@@ -161,10 +191,14 @@ hobbyists to add a new CI step from scratch, a much higher-friction ask than
 
 ## Verdict
 
-**Angle B target segment: open-PDK only, based on ~21-25 total real hits**
-(dominated by the 14-repo CACE/sky130/sg13g2 cluster and the 2-repo
-CACE+ngspice cluster; the PCB/KiCad population is real but tiny (7 repos)
-and structurally weaker — no existing CI gate to extend, versus open-PDK's
-existing CACE regression jobs). Per the pre-registered rule: this counts as
-"trivial outside open-PDK," so angle B scopes to open-PDK only for this
-sprint. Outreach and the NLnet application (below) are scoped accordingly.
+**Angle B target segment: open-PDK only, based on 28 total on-topic hits**
+(5 + 7 + 14 + 2 + 0, see the reconciled table above — dominated by the
+14-repo CACE/sky130/sg13g2 cluster and the 2-repo CACE+ngspice cluster, with
+Q1's sampled open-PDK hits adding 5 more; the PCB/KiCad population is real
+but tiny (7 repos, all of Q2) and structurally weaker — no existing CI gate
+to extend, versus open-PDK's existing CACE regression jobs). 21 of the 28
+(75%) are open-PDK; the PCB/KiCad segment is the remaining 7 (25%) and has
+zero repos already trust-checking a result. Per the pre-registered rule:
+this counts as "trivial outside open-PDK," so angle B scopes to open-PDK
+only for this sprint. Outreach and the NLnet application (below) are scoped
+accordingly.
