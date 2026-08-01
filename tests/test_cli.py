@@ -35,7 +35,7 @@ def patch_evaluate(monkeypatch, results_by_path=None, fixed_result=None, raise_e
     """
     calls = []
 
-    def fake_evaluate(path, ngspice_path=None):
+    def fake_evaluate(path, ngspice_path=None, no_exec=False):
         calls.append((str(path), ngspice_path))
         if raise_exc is not None:
             raise raise_exc

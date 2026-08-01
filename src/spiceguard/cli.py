@@ -72,6 +72,14 @@ def _build_parser():
              "(for editors, CI, and other tooling). Exit codes are unchanged.",
     )
     parser.add_argument(
+        "--no-exec",
+        action="store_true",
+        dest="no_exec",
+        help="Strip .control blocks and .include lines before simulation. "
+             "Use for netlists you did not write (AI-generated, PR-submitted). "
+             "Applies to the default review mode.",
+    )
+    parser.add_argument(
         "paths",
         nargs="*",
         metavar="FILE",
@@ -189,7 +197,7 @@ def main(argv=None):
     codes, results = [], []
     try:
         for p in paths:
-            r = evaluate(p, ngspice_path=ngspice_path)
+            r = evaluate(p, ngspice_path=ngspice_path, no_exec=args.no_exec)
             results.append(r)
             codes.append(exit_code(r.verdict))
     except NgspiceNotFound as exc:
