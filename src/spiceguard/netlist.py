@@ -112,11 +112,33 @@ def parse_and_flatten(text, base_dir):
         # `.endl` (the `.lib` block terminator) has no filename to resolve;
         # it falls through unmatched below and is ignored downstream like
         # any other dot-directive line.
+        #
+        # `.lib` has two distinct forms that must NOT be conflated:
+        #   .lib <file> <section>   -> two tokens: splice <file> for real.
+        #   .lib <section>          -> one token: a section-HEADER line
+        #                              *inside* a library file (its content
+        #                              is already being spliced by the
+        #                              enclosing two-token .lib call above);
+        #                              it names no file on disk. Treating it
+        #                              as a filename produced a spurious
+        #                              missing_include WARN on every legit
+        #                              `.lib file section` netlist once the
+        #                              file's own `.lib <section>` header
+        #                              line was reached by recursion.
         result = []
         for line in raw_lines:
             sl = line.lower()
             if INCLUDE_DIRECTIVE.match(sl):
-                m = re.match(r'\.(?:inc[a-z]*|lib)\s+"?([^"\s]+)"?', line, re.I)
+                # `.inc[a-z]*` always takes exactly one argument (the file).
+                m = re.match(r'\.inc[a-z]*\s+"?([^"\s]+)"?', line, re.I)
+                if not m:
+                    # Only the two-token `.lib <file> <section>` form names
+                    # an actual file; the one-token `.lib <section>` header
+                    # form deliberately does NOT match here and falls
+                    # through to `result.append(line)` below, unresolved and
+                    # unwarned (same treatment as `.endl`).
+                    m = re.match(
+                        r'\.lib\s+"?([^"\s]+)"?\s+"?([^"\s]+)"?\s*$', line, re.I)
                 if m:
                     fname = m.group(1).strip()
                     if re.match(r'https?://', fname, re.I) or re.match(r'ftp://', fname, re.I):
