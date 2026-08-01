@@ -248,11 +248,20 @@ netlist like a script you are about to run**, because in two ways it is one:
   disk. The contents are parsed as a netlist, not printed.
 
 **Only run spiceguard on netlists you trust.** It is a local dev/CI utility,
-not a sandbox.
+not a sandbox — `--no-exec` is defense-in-depth against the two specific
+attack surfaces above, not a guarantee that a hostile netlist is safe to
+evaluate.
 
 For untrusted netlists (AI-generated, PR-submitted) use `--no-exec`, which
-strips `.control` blocks and `.include` lines before simulation; the MCP
-server does this unconditionally.
+strips exactly these lines before simulation:
+
+- `.control` ... `.endc` blocks (arbitrary shell commands), and
+- file-splicing directives: `.include` and every ngspice-honored prefix
+  abbreviation of it (`.inc`, `.incl`, `.inclu`, `.includ`), plus `.lib`
+  (library file + section) and its `.endl` block terminator — i.e. anything
+  that pulls another file's content into the netlist ngspice runs.
+
+The MCP server does this unconditionally.
 
 Hardening that *is* in place:
 

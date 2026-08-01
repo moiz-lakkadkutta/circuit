@@ -2,8 +2,10 @@
 spiceguard MCP server: lets AI agents verify SPICE netlists they generate.
 
 Security: every netlist is treated as UNTRUSTED. Simulation always runs in
-no-exec mode (.control blocks and .include lines stripped before ngspice sees
-the text). There is deliberately no flag to disable this.
+no-exec mode — `.control` blocks and file-splicing directives (`.include`,
+its `.inc`/`.incl`/`.inclu`/`.includ` prefix forms, and `.lib`/`.endl`) are
+stripped before ngspice sees the text. There is deliberately no flag to
+disable this. This is defense-in-depth, not a sandbox guarantee.
 """
 from mcp.server.fastmcp import FastMCP
 
@@ -42,9 +44,23 @@ def check_netlist(netlist: str) -> dict:
 
     ngspice often exits 0 with a plausible but WRONG answer (ungrounded
     circuits, relaxed fallback estimates). Call this after generating any
-    SPICE netlist. verdict=TRUSTWORTHY means simulated clean; SUSPECT means
-    exit 0 but trust issues were found (read the issues and fix them);
-    FAILED means the simulation errored.
+    SPICE netlist.
+
+    Returns a dict with a "mode" key that determines which verdict
+    vocabulary "verdict" uses:
+
+    - mode="no-exec" (ngspice is installed; the normal case): a real
+      simulation ran, sandboxed by stripping .control blocks and
+      file-splicing directives first. verdict is one of:
+      TRUSTWORTHY (simulated clean), SUSPECT (exit 0 but trust issues were
+      found — read "issues" and fix them), or FAILED (the simulation
+      errored).
+    - mode="static-only" (ngspice is NOT installed on this machine): no
+      simulation ran at all — only parser/static checks. verdict is one of:
+      PASSED_STATIC (static checks found nothing; this is NOT the same
+      guarantee as TRUSTWORTHY, since silent/log-based failures can only be
+      caught by an actual simulation run) or SUSPECT (a static check fired).
+      "note" explains that installing ngspice enables full verification.
     """
     return check_netlist_impl(netlist)
 

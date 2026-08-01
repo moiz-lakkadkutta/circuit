@@ -1,14 +1,27 @@
 name: Deploy site
 on:
-  push:
-    branches: [main]
-    paths: ["site/**", "src/**", "pyproject.toml", ".github/workflows/pages.yml"]
+  # NOTE: the `push` trigger is intentionally removed for now. This workflow
+  # publishes a live GitHub Pages site whose Formspree action is still the
+  # literal placeholder "FORMSPREE_ID" and whose in-browser demo has not been
+  # click-tested. Restore the push trigger below ONLY after:
+  #   1. site/index.html's Formspree form action is set to a real form ID, and
+  #   2. the in-browser static demo has been verified end-to-end in a browser.
+  # Until then, deploy manually via workflow_dispatch (Actions tab) so merges
+  # to main can't silently publish a broken/placeholder page.
+  #
+  # push:
+  #   branches: [main]
+  #   paths: ["site/**", "src/**", "pyproject.toml", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:

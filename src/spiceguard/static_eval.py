@@ -9,7 +9,7 @@ PASSED_STATIC.
 from pathlib import Path
 
 from spiceguard.checks import static_checks
-from spiceguard.core import SEVERITY_ORDER
+from spiceguard.core import SEVERITY_ORDER, TRUST_BREAKING
 from spiceguard.netlist import parse_and_flatten
 from spiceguard.sanitize import sanitize_netlist
 
@@ -26,7 +26,7 @@ def evaluate_static(text):
             seen.add(i.code)
             deduped.append(i)
 
-    trust_breaking = any(i.severity in ("FATAL", "SILENT", "WARN") for i in deduped)
+    trust_breaking = any(i.severity in TRUST_BREAKING for i in deduped)
     return {
         "mode": "static-only",
         "verdict": "SUSPECT" if trust_breaking else "PASSED_STATIC",
