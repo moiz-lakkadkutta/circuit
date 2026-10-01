@@ -1,0 +1,15 @@
+* RC Low-Pass Filter, fc ~ 1kHz
+* fc = 1/(2*pi*R*C), R=1.6k, C=100nF -> fc ~ 995 Hz
+
+Vin in 0 SIN(0 1 1000)
+R1 in out 1.6k
+C1 out 0 100n
+
+.tran 10u 5m
+
+.control
+run
+plot v(in) v(out)
+.endc
+
+.end

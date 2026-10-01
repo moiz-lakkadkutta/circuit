@@ -74,7 +74,7 @@ def kicad_preflight(netlist_text: str) -> "list[Issue]":
     return issues
 
 
-def check_kicad_netlist(path_or_text, ngspice_path=None):
+def check_kicad_netlist(path_or_text, ngspice_path=None, no_exec=False):
     """Run kicad_preflight + full evaluation on a KiCad SPICE netlist.
 
     Parameters
@@ -88,6 +88,11 @@ def check_kicad_netlist(path_or_text, ngspice_path=None):
         temporary file for evaluation.
     ngspice_path:
         Optional explicit path to the ngspice binary.
+    no_exec:
+        Strip ``.control`` blocks and file-splicing directives
+        (``.include``/``.inc*``/``.lib``) before simulation — for netlists
+        you did not write (AI-generated, PR-submitted, the CI pipe
+        workflow). Threaded straight through to ``evaluate()``.
 
     Returns
     -------
@@ -113,14 +118,14 @@ def check_kicad_netlist(path_or_text, ngspice_path=None):
         # preflight-checked against the same normalised text that evaluate()
         # actually analyses, not the unconverted raw file bytes.
         text, _src, _conv_warns = _formats.load_as_netlist(str(p))
-        result = evaluate(str(p), ngspice_path=ngspice_path)
+        result = evaluate(str(p), ngspice_path=ngspice_path, no_exec=no_exec)
     else:
         text = str(path_or_text)
         with tempfile.NamedTemporaryFile("w", suffix=".cir", delete=False) as f:
             f.write(text)
             tmp_path = f.name
         try:
-            result = evaluate(tmp_path, ngspice_path=ngspice_path)
+            result = evaluate(tmp_path, ngspice_path=ngspice_path, no_exec=no_exec)
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 

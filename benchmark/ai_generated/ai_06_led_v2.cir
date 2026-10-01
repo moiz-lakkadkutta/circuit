@@ -1,0 +1,18 @@
+* 5V LED circuit with current-limiting resistor
+* Using ~15mA forward current, Vf ~ 2.1V for a red LED
+* R = (5 - 2.1) / 0.015 ~ 193 ohm -> use 220 ohm (standard value)
+
+V1 1 0 5
+R1 1 2 220
+D1 2 0 DLED
+
+.model DLED D(IS=93.2p RS=42m N=3.73 BV=4 IBV=10u CJO=2.97p VJ=0.75 M=0.333 TT=4.32u)
+
+.op
+
+.control
+run
+print v(2) i(D1)
+.endc
+
+.end

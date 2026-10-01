@@ -1,29 +1,20 @@
-# circuit / spiceguard
+# spiceguard
 
-This repo started as **CircuitCLI**, an image/photo-to-SPICE-simulation pipeline
-(YOLO + OCR + graph → ngspice). That idea was dropped after research showed the
-problem it targeted ("redrawing schematics") isn't a pain users actually report,
-and the obvious adjacent gaps were already taken or funded.
+**ngspice said exit 0. The answer was still wrong.**
 
-It is now exploring a different, evidence-led direction: a **SPICE result
-trust-guard**.
+Modern ngspice recovers from many classic convergence problems on its own —
+and when it can't, it often returns **exit code 0 with a plausible but wrong
+answer** (a relaxed fallback estimate, or arbitrary voltages on an ungrounded
+node). Nothing in the standard flow warns you. This bites hardest on netlists
+you didn't write yourself: AI-generated circuits and PR submissions.
 
----
+`spiceguard` answers one question about a SPICE run: **can I trust this
+result?** It combines static netlist analysis, ngspice failure-log decoding,
+and silent-failure detection — as a CLI, an [MCP server for AI
+agents](mcp-server/), a [VS Code extension](vscode/), and a [KiCad
+workflow](kicad/).
 
-## What is spiceguard?
-
-Modern ngspice recovers from many classic convergence problems on its own — and
-when it can't, it often returns **exit code 0 with a plausible but wrong answer**
-(a relaxed fallback estimate, or arbitrary voltages on an ungrounded node).
-Nothing in the standard flow warns you.
-
-`spiceguard` answers one question about a SPICE run: **can I trust this result?**
-
-It combines static netlist analysis, ngspice failure-log decoding (cryptic
-internal names translated to the real component plus a specific fix), and
-silent-failure detection (exit-0 runs that are still untrustworthy). It accepts
-netlists from ngspice, KiCad, LTspice, and PSpice, and can convert LTspice `.asc`
-schematics (experimental, built-in 2-pin symbols only).
+*Project history (image-to-SPICE origins and the pivot): [docs/HISTORY.md](docs/HISTORY.md).*
 
 ---
 
@@ -84,8 +75,8 @@ export NGSPICE=/usr/local/bin/ngspice
 ## CLI usage
 
 ```
-spiceguard [--ngspice PATH] [--version] [--help] FILE...
-spiceguard kicad [--ngspice PATH] FILE...
+spiceguard [--ngspice PATH] [--no-exec] [--version] [--help] FILE...
+spiceguard kicad [--ngspice PATH] [--no-exec] FILE...
 ```
 
 Pass one or more netlist (or schematic) files. When multiple files are given,
@@ -98,6 +89,7 @@ spiceguard evaluates each in sequence and exits with the worst verdict across al
 | `FILE...` | One or more netlist or schematic files to check |
 | `--ngspice PATH` | Explicit path to the ngspice binary |
 | `--json` | Emit results as a JSON array (for editors, CI, tooling) |
+| `--no-exec` | Strip `.control` blocks and file-splicing directives (`.include`/`.inc*`/`.lib`) before simulation — for netlists you did not write; applies to both the default review mode and `spiceguard kicad` |
 | `--version` | Print version and exit |
 | `--help` | Show usage |
 
@@ -239,8 +231,9 @@ numerically but FAILED is the worst outcome).
 | **Docker** | [`docker/`](docker/) | Zero-setup image with ngspice bundled |
 | **VS Code** | [`vscode/`](vscode/) | Inline trust diagnostics as you edit `.cir`/`.net`/`.sp` files (consumes `--json`) |
 | **KiCad** | [`kicad/`](kicad/) | `kicad-cli` netlist export → `spiceguard kicad`, as a one-liner, helper script, or CI step |
+| **MCP server** | [`mcp-server/`](mcp-server/) | Lets AI agents (Claude Code, Cursor, ...) verify SPICE netlists they generate before treating the result as ground truth |
 
-All three build on the same engine; the `--json` output makes spiceguard easy to
+All four build on the same engine; the `--json` output makes spiceguard easy to
 wire into editors, CI, and other tools.
 
 ## Security
@@ -255,7 +248,20 @@ netlist like a script you are about to run**, because in two ways it is one:
   disk. The contents are parsed as a netlist, not printed.
 
 **Only run spiceguard on netlists you trust.** It is a local dev/CI utility,
-not a sandbox.
+not a sandbox — `--no-exec` is defense-in-depth against the two specific
+attack surfaces above, not a guarantee that a hostile netlist is safe to
+evaluate.
+
+For untrusted netlists (AI-generated, PR-submitted) use `--no-exec`, which
+strips exactly these lines before simulation:
+
+- `.control` ... `.endc` blocks (arbitrary shell commands), and
+- file-splicing directives: `.include` and every ngspice-honored prefix
+  abbreviation of it (`.inc`, `.incl`, `.inclu`, `.includ`), plus `.lib`
+  (library file + section) and its `.endl` block terminator — i.e. anything
+  that pulls another file's content into the netlist ngspice runs.
+
+The MCP server does this unconditionally.
 
 Hardening that *is* in place:
 
@@ -299,15 +305,5 @@ PYTHONPATH=src python3 -m pytest -q
 Observed output on the current suite:
 
 ```
-82 passed in 3.93s
+119 passed in 2.61s
 ```
-
----
-
-## How we got here
-
-1. Audited the original image-to-sim idea (market / engineering / business).
-2. Deep research across the full EDA/sim workflow + a competition cross-check.
-3. Ruled out taken/funded gaps (AR debugging = Cadence inspectAR; AI autorouting
-   = Quilter et al.; SI/PI = heavy field-solver work).
-4. Landed on the SPICE result-trustworthiness wedge and built the tool.

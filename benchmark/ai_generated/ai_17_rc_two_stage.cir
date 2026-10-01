@@ -1,0 +1,20 @@
+* Capacitively coupled two-stage RC network - AC analysis
+
+Vin in 0 AC 1
+
+R1 in n1 10k
+C1 n1 n2 1u
+R2 n2 0 10k
+
+R3 n2 n3 10k
+C2 n3 n4 1u
+R4 n4 0 10k
+
+.ac dec 20 1 100k
+
+.control
+run
+plot db(v(n4))
+.endc
+
+.end

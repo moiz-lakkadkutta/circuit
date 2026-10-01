@@ -1,0 +1,21 @@
+* Basic two-transistor NPN current mirror
+* Reference current = 1mA
+
+Vcc vcc 0 12
+Iref vcc ref 1m
+
+Q1 ref ref 0 QMIR
+Q2 out ref 0 QMIR
+
+.model QMIR NPN(BF=100 IS=1e-14 VAF=100)
+
+Rload vcc out 5k
+
+.op
+
+.control
+run
+print i(Q2.c) v(out)
+.endc
+
+.end

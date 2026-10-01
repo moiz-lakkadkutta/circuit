@@ -404,3 +404,82 @@ X1 N1 N2 ASYM
         f"C1 should connect [N2, N1] (b=N2, a=N1), got {c1.nodes}. "
         "If [N1, N2] appears, ports were swapped."
     )
+
+
+# ---------------------------------------------------------------------------
+# Regression: `.lib <file> <section>` vs bare `.lib <section>` header line.
+#
+# `.lib` has two distinct forms:
+#   .lib <file> <section>   -> splice <file>, jump to <section> within it
+#   .lib <section>          -> a section-HEADER line *inside* a library file
+#                              (its own content is already being spliced by
+#                              the enclosing two-token .lib call); it names
+#                              no file on disk.
+# Treating both forms with the same "first token is a filename" regex makes
+# the section name from the file's own `.lib <section>` header line look
+# like an unresolvable filename once that file's content is spliced in,
+# producing a spurious missing_include WARN that flips a healthy netlist
+# TRUSTWORTHY -> SUSPECT.
+# ---------------------------------------------------------------------------
+
+def test_lib_file_section_form_resolves_without_missing_include_warning(tmp_path):
+    """`.lib <file> <section>` must splice <file> for real; the library
+    file's own `.lib <section>` header line (found once spliced) must NOT
+    be re-treated as a second, unresolvable file reference."""
+    (tmp_path / "models.lib").write_text(
+        ".lib tt\n"
+        ".model DMOD D(is=1e-14)\n"
+        ".endl\n"
+    )
+    text = (
+        "* lib file+section test\n"
+        ".lib models.lib tt\n"
+        "V1 A 0 5\n"
+        "D1 A 0 DMOD\n"
+        ".op\n"
+        ".end\n"
+    )
+    elements, node_elems, parse_issues = parse_and_flatten(text, tmp_path)
+    codes = issue_codes(parse_issues)
+    assert "missing_include" not in codes, (
+        f"Section name 'tt' from models.lib's own `.lib tt` header line was "
+        f"wrongly treated as a filename to resolve: {parse_issues}"
+    )
+
+
+def test_bare_lib_section_header_produces_no_warning():
+    """A standalone one-token `.lib <section>` line (as it appears inside a
+    library file, or if present at top level) must not be treated as an
+    unresolvable include — it names a section, not a file."""
+    text = (
+        "* bare lib section header (as would appear inside a library file)\n"
+        ".lib tt\n"
+        ".model DMOD D(is=1e-14)\n"
+        ".endl\n"
+        "V1 A 0 5\n"
+        "D1 A 0 DMOD\n"
+        ".op\n"
+        ".end\n"
+    )
+    elements, node_elems, parse_issues = parse_and_flatten(text, Path("."))
+    codes = issue_codes(parse_issues)
+    assert "missing_include" not in codes, f"Unexpected parse issues: {parse_issues}"
+
+
+def test_lib_file_section_form_still_reports_genuinely_missing_file():
+    """The two-token `.lib <file> <section>` form must still warn when the
+    referenced FILE (not the section) genuinely does not exist — this is
+    the real missing_include behaviour and must stay green."""
+    text = (
+        "* lib pointing at a nonexistent file\n"
+        ".lib does_not_exist.lib tt\n"
+        "V1 A 0 5\n"
+        "R1 A 0 1k\n"
+        ".op\n"
+        ".end\n"
+    )
+    elements, node_elems, parse_issues = parse_and_flatten(text, Path("/tmp"))
+    codes = issue_codes(parse_issues)
+    assert "missing_include" in codes, (
+        f"Expected missing_include for a genuinely missing .lib file: {parse_issues}"
+    )

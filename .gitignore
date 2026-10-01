@@ -6,3 +6,5 @@ captures/
 *.egg-info/
 dist/
 build/
+site/wheels/
+outreach/

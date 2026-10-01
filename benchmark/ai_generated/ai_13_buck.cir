@@ -1,0 +1,26 @@
+* Buck converter power stage, ideal switch, 12V -> 5V
+* Duty cycle D ~ Vout/Vin = 5/12 ~ 0.417, switching freq 100kHz
+
+Vin vin 0 DC 12
+
+* PWM gate drive for ideal switch (behavioral pulse)
+Vgate gate 0 PULSE(0 1 0 10n 10n 4.17u 10u)
+
+Sw vin sw_out gate 0 SWMOD
+.model SWMOD SW(VT=0.5 VH=0.1 RON=0.01 ROFF=1MEG)
+
+D1 0 sw_out DIDEAL
+.model DIDEAL D(IS=1e-14 RS=0.001)
+
+L1 sw_out vout 100u
+Cout vout 0 100u
+Rload vout 0 5
+
+.tran 100n 2m
+
+.control
+run
+plot v(vout) v(sw_out)
+.endc
+
+.end

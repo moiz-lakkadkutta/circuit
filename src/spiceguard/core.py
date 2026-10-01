@@ -8,6 +8,7 @@ from spiceguard import formats
 from spiceguard.checks import Issue, extract_signals, static_checks, log_checks, silent_checks
 from spiceguard.netlist import parse_and_flatten
 from spiceguard.ngspice import run_ngspice_text
+from spiceguard.sanitize import sanitize_netlist
 
 SEVERITY_ORDER = {"FATAL": 0, "SILENT": 1, "WARN": 2, "INFO": 3}
 TRUST_BREAKING = {"FATAL", "SILENT", "WARN"}  # INFO never lowers the verdict
@@ -40,23 +41,37 @@ def verdict_from(rc, issues):
     return "TRUSTWORTHY"
 
 
-def evaluate(path, ngspice_path=None):
-    """Evaluate a netlist (or convertible schematic) and return a Result."""
-    netlist_text, source, conv_warnings = formats.load_as_netlist(path)
-    elements, node_elems, parse_issues = parse_and_flatten(netlist_text, Path(path).parent)
-    rc, log = run_ngspice_text(netlist_text, ngspice_path=ngspice_path, cwd=Path(path).parent)
+def evaluate_text(text, ngspice_path=None, no_exec=False, label="<netlist>",
+                  cwd=None, extra_issues=None):
+    """Evaluate a netlist given as text and return a Result.
+
+    no_exec=True strips .control blocks and file-splicing directive lines
+    (.include/.inc*/.lib/.endl) BEFORE parsing and simulation (see
+    sanitize.py) — required for untrusted input (MCP, CI on PR-submitted
+    netlists). Stripping is recorded as an INFO issue and never changes the
+    verdict.
+    """
+    issues = list(extra_issues) if extra_issues else []
+    if no_exec:
+        san = sanitize_netlist(text)
+        text = san.text
+        if san.removed_blocks or san.removed_includes:
+            issues.append(Issue(
+                "INFO", "no_exec_stripped",
+                f"no-exec mode removed {san.removed_blocks} .control block(s) "
+                f"and {len(san.removed_includes)} file-splicing directive(s) "
+                f"before simulation; results may differ from a full run."))
+
+    base_dir = cwd if cwd is not None else Path(".")
+    elements, node_elems, parse_issues = parse_and_flatten(text, base_dir)
+    rc, log = run_ngspice_text(text, ngspice_path=ngspice_path, cwd=cwd)
     sig = extract_signals(log, rc)
 
-    issues = parse_issues \
+    issues += parse_issues \
         + static_checks(elements, node_elems) \
         + log_checks(sig, node_elems) \
         + silent_checks(sig)
-    for w in conv_warnings:
-        issues.append(Issue("WARN", "conversion", w))
-    if source != "netlist":
-        issues.append(Issue("INFO", "converted",
-            f"Input read as {source}. Verify the generated netlist below against "
-            f"LTspice's own 'View > SPICE Netlist' before trusting the result."))
+
     # de-dup by code, keep most severe ordering
     seen, deduped = set(), []
     for i in sorted(issues, key=lambda x: SEVERITY_ORDER.get(x.severity, 9)):
@@ -64,7 +79,21 @@ def evaluate(path, ngspice_path=None):
             seen.add(i.code)
             deduped.append(i)
 
-    return Result(str(path), verdict_from(rc, deduped), rc, deduped, sig, source, netlist_text)
+    return Result(label, verdict_from(rc, deduped), rc, deduped, sig, "netlist", text)
+
+
+def evaluate(path, ngspice_path=None, no_exec=False):
+    """Evaluate a netlist (or convertible schematic) file and return a Result."""
+    netlist_text, source, conv_warnings = formats.load_as_netlist(path)
+    extra = [Issue("WARN", "conversion", w) for w in conv_warnings]
+    if source != "netlist":
+        extra.append(Issue("INFO", "converted",
+            f"Input read as {source}. Verify the generated netlist below against "
+            f"LTspice's own 'View > SPICE Netlist' before trusting the result."))
+    r = evaluate_text(netlist_text, ngspice_path=ngspice_path, no_exec=no_exec,
+                      label=str(path), cwd=Path(path).parent, extra_issues=extra)
+    r.source = source
+    return r
 
 
 def exit_code(verdict):

@@ -1,0 +1,24 @@
+* Relaxation oscillator (555-style astable) built from an ideal comparator
+* Comparator has built-in hysteresis via positive feedback divider R2/R3
+
+Vcc vcc 0 12
+
+* Positive feedback network (hysteresis)
+R2 out fb 20k
+R3 fb 0 10k
+
+* Comparator: behavioral voltage source, saturates near the rails
+Ecomp out 0 TABLE {V(fb,cap)} = (-0.01,0) (0.01,12)
+
+* RC timing network charges/discharges toward the comparator output
+R1 out cap 15k
+C1 cap 0 10n
+
+.tran 1u 3m
+
+.control
+run
+plot v(cap) v(out) v(fb)
+.endc
+
+.end

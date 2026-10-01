@@ -72,6 +72,15 @@ def _build_parser():
              "(for editors, CI, and other tooling). Exit codes are unchanged.",
     )
     parser.add_argument(
+        "--no-exec",
+        action="store_true",
+        dest="no_exec",
+        help="Strip .control blocks and file-splicing directives "
+             "(.include/.inc*/.lib) before simulation. "
+             "Use for netlists you did not write (AI-generated, PR-submitted). "
+             "Applies to both the default review mode and the kicad subcommand.",
+    )
+    parser.add_argument(
         "paths",
         nargs="*",
         metavar="FILE",
@@ -166,14 +175,16 @@ def main(argv=None):
                 if p == "-":
                     # Pass raw text; check_kicad_netlist handles temp-file creation.
                     text = sys.stdin.read()
-                    r = _kicad_mod.check_kicad_netlist(text, ngspice_path=ngspice_path)
+                    r = _kicad_mod.check_kicad_netlist(
+                        text, ngspice_path=ngspice_path, no_exec=args.no_exec)
                 else:
                     # check_kicad_netlist accepts path-or-text, so a missing path
                     # would be silently treated as netlist text. The CLI always
                     # passes a file path here, so validate it first for a clean error.
                     if not Path(p).is_file():
                         raise FileNotFoundError(2, "No such file or directory", p)
-                    r = _kicad_mod.check_kicad_netlist(p, ngspice_path=ngspice_path)
+                    r = _kicad_mod.check_kicad_netlist(
+                        p, ngspice_path=ngspice_path, no_exec=args.no_exec)
                 results.append(r)
                 codes.append(exit_code(r.verdict))
         except NgspiceNotFound as exc:
@@ -189,7 +200,7 @@ def main(argv=None):
     codes, results = [], []
     try:
         for p in paths:
-            r = evaluate(p, ngspice_path=ngspice_path)
+            r = evaluate(p, ngspice_path=ngspice_path, no_exec=args.no_exec)
             results.append(r)
             codes.append(exit_code(r.verdict))
     except NgspiceNotFound as exc:

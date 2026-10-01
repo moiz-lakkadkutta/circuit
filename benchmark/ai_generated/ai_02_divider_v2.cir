@@ -1,0 +1,15 @@
+* 9V voltage divider - measuring midpoint voltage
+* R1 = 10k (top), R2 = 4.7k (bottom)
+
+Vbatt in 0 9
+R1 in mid 10k
+R2 mid 0 4.7k
+
+.op
+
+.control
+run
+print v(mid)
+.endc
+
+.end

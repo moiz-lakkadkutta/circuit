@@ -1,0 +1,33 @@
+* Sallen-Key 10kHz Low-Pass Filter using two op-amp stages (subcircuit-based)
+
+.subckt OPAMP1 vip vin vout
+* simple high-gain ideal op-amp macro
+Eout vout 0 vip vin 200k
+.ends OPAMP1
+
+Vsp vp 0 15
+Vsn vn 0 -15
+Vin vin 0 AC 1
+
+R1a vin a 10k
+R2a a b 10k
+C1a a out1 1.6n
+C2a b 0 1.6n
+Xu1 b out1 out1 OPAMP1
+
+R1b out1 c 10k
+R2b c d 10k
+C1b c out2 1.6n
+C2b d 0 1.6n
+Xu2 d out2 out2 OPAMP1
+
+RL out2 0 100k
+
+.ac dec 10 1 1Meg
+
+.control
+run
+plot vdb(out2)
+.endc
+
+.end

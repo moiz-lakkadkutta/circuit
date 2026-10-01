@@ -1,0 +1,15 @@
+* Voltage Divider: 9V battery with 10k and 4.7k resistors
+* Measure voltage at the midpoint (node 2)
+
+V1 1 0 DC 9
+R1 1 2 10k
+R2 2 0 4.7k
+
+.op
+
+.control
+run
+print v(2)
+.endc
+
+.end

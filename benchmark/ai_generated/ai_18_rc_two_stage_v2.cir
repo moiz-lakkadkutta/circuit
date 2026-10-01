@@ -1,0 +1,21 @@
+* Two-stage RC network with capacitive coupling between stages
+* AC sweep to see the combined response
+
+Vs 1 0 AC 1 0
+
+R1 1 2 4.7k
+C1 2 3 470n
+R2 3 0 4.7k
+
+R3 3 4 4.7k
+C2 4 5 470n
+R4 5 0 4.7k
+
+.ac dec 50 10 1meg
+
+.control
+run
+plot vdb(5) vp(5)
+.endc
+
+.end

@@ -1,0 +1,15 @@
+* Simple RC low-pass filter with 1 kHz cutoff frequency
+* Cutoff: fc = 1/(2*pi*R*C) ~ 1kHz  (R=1k, C=159nF)
+
+Vs 1 0 SIN(0 5 1000 0 0)
+R1 1 2 1k
+C1 2 0 159n
+
+.tran 1u 10m 0 1u
+
+.control
+run
+plot v(1) v(2)
+.endc
+
+.end
